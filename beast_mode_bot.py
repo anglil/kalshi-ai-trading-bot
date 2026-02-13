@@ -35,6 +35,7 @@ from src.utils.logging_setup import setup_logging, get_trading_logger
 from src.utils.database import DatabaseManager
 from src.clients.kalshi_client import KalshiClient
 from src.clients.xai_client import XAIClient
+from src.clients.model_router import ModelRouter
 from src.config.settings import settings
 
 # Import Beast Mode components
@@ -101,6 +102,13 @@ class BeastModeBot:
             # Initialize other components
             kalshi_client = KalshiClient()
             xai_client = XAIClient(db_manager=db_manager)  # Pass db_manager for LLM logging
+
+            # Initialize multi-model router (wraps xAI + OpenRouter)
+            self.model_router = ModelRouter(xai_client=xai_client, db_manager=db_manager)
+            self.logger.info(
+                "ModelRouter initialized for multi-model ensemble",
+                ensemble_enabled=settings.ensemble.enabled,
+            )
             
             # Small delay to ensure everything is ready
             await asyncio.sleep(1)
@@ -135,7 +143,7 @@ class BeastModeBot:
             # Wait for shutdown or completion
             await asyncio.gather(*tasks, return_exceptions=True)
             
-            await xai_client.close()
+            await self.model_router.close()
             await kalshi_client.close()
             
             self.logger.info("🏁 Beast Mode Bot shut down gracefully")

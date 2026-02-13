@@ -46,7 +46,7 @@ async def process_and_queue_markets(
                     market_data["expiration_time"].replace("Z", "+00:00")
                 ).timestamp()
             ),
-            category=market_data["category"],
+            category=market_data.get("category", "unknown"),
             status=market_data["status"],
             last_updated=datetime.now(),
             has_position=has_position,

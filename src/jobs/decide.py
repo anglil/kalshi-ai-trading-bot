@@ -1,5 +1,6 @@
 """
 Trading decision job - analyzes markets and generates trading decisions.
+Supports both single-model (legacy) and multi-agent ensemble decision modes.
 """
 
 import asyncio
@@ -13,6 +14,7 @@ from src.config.settings import settings
 from src.utils.logging_setup import get_trading_logger
 from src.clients.xai_client import XAIClient
 from src.clients.kalshi_client import KalshiClient
+from src.clients.model_router import ModelRouter
 
 
 def _calculate_dynamic_quantity(
@@ -57,11 +59,76 @@ def _calculate_dynamic_quantity(
     return quantity
 
 
+async def _run_ensemble_decision(
+    market_data: Dict,
+    news_summary: str,
+    model_router: ModelRouter,
+) -> Optional[Dict]:
+    """
+    Run the multi-agent ensemble decision pipeline.
+    Returns a dict with action, side, confidence, limit_price, reasoning or None.
+    """
+    logger = get_trading_logger("ensemble_decision")
+    try:
+        from src.agents.debate import DebateRunner
+        from src.agents.ensemble import EnsembleRunner
+
+        runner = DebateRunner()
+
+        # Build get_completion callables for each agent role using the model router
+        async def _make_completion(model_name):
+            async def _fn(prompt):
+                return await model_router.get_completion(
+                    prompt=prompt,
+                    model=model_name,
+                    strategy="ensemble",
+                    query_type="agent_analysis",
+                    market_id=market_data.get("ticker"),
+                )
+            return _fn
+
+        # Map agent roles to their configured models
+        model_map = settings.ensemble.models
+        completions = {}
+        for model_id, cfg in model_map.items():
+            role = cfg["role"]
+            completions[role] = await _make_completion(model_id)
+        # Trader always uses Grok-4
+        if "trader" not in completions:
+            completions["trader"] = await _make_completion("grok-4")
+
+        # Inject news into market_data for agents
+        enriched_data = {**market_data, "news_summary": news_summary}
+
+        debate_result = await runner.run_debate(
+            enriched_data, completions, context={}
+        )
+
+        if debate_result.get("error"):
+            logger.warning(f"Ensemble debate had error: {debate_result['error']}")
+
+        # If debate produced a valid action, return it
+        action = debate_result.get("action", "SKIP").upper()
+        if action in ("BUY", "SELL"):
+            logger.info(
+                f"Ensemble decision: {action} {debate_result.get('side')} "
+                f"confidence={debate_result.get('confidence'):.2f}"
+            )
+            return debate_result
+
+        return None
+
+    except Exception as e:
+        logger.error(f"Ensemble decision failed: {e}", exc_info=True)
+        return None
+
+
 async def make_decision_for_market(
     market: Market,
     db_manager: DatabaseManager,
     xai_client: XAIClient,
     kalshi_client: KalshiClient,
+    model_router: Optional[ModelRouter] = None,
 ) -> Optional[Position]:
     """
     Analyzes a single market and makes a trading decision with performance optimizations.
@@ -185,7 +252,18 @@ async def make_decision_for_market(
                         return position
 
         # --- Standard LLM Decision-Making ---
-        logger.info("Proceeding with standard LLM decision analysis.")
+        # Feature flags
+        multi_model_ensemble = getattr(settings, 'multi_model_ensemble', False) or (
+            hasattr(settings, 'ensemble') and settings.ensemble.enabled
+        )
+        sentiment_analysis = getattr(settings, 'sentiment_analysis', False) or (
+            hasattr(settings, 'sentiment') and settings.sentiment.enabled
+        )
+        logger.info(
+            "Proceeding with LLM decision analysis.",
+            ensemble_enabled=multi_model_ensemble,
+            sentiment_enabled=sentiment_analysis,
+        )
         
         # Cost-optimized market data fetching
         full_market_data_response = await kalshi_client.get_market(market.market_id)
@@ -199,48 +277,88 @@ async def make_decision_for_market(
         }
 
         # COST OPTIMIZATION: Skip expensive news search for low-volume markets
-        if (settings.trading.skip_news_for_low_volume and 
+        if (settings.trading.skip_news_for_low_volume and
             market.volume < settings.trading.news_search_volume_threshold):
             logger.info(f"Skipping news search for low volume market {market.market_id} (volume: {market.volume})")
             news_summary = f"Low volume market ({market.volume}). Analysis based on market data only."
             estimated_search_cost = 0.0
         else:
-            # Use optimized search with timeout and fallback
-            try:
-                news_summary = await asyncio.wait_for(
-                    xai_client.search(market.title, max_length=200),
-                    timeout=15.0
-                )
-                estimated_search_cost = 0.02  # Rough estimate for search cost
-            except asyncio.TimeoutError:
-                logger.warning(f"Search timeout for market {market.market_id}, using fallback")
-                news_summary = f"Search timeout. Analyzing {market.title} based on market data only."
-                estimated_search_cost = 0.0
-            except Exception as e:
-                logger.warning(f"Search failed for market {market.market_id}, continuing without news", error=str(e))
-                news_summary = f"News search unavailable. Analysis based on market data only."
-                estimated_search_cost = 0.0
+            # Try sentiment pipeline first if enabled
+            if sentiment_analysis:
+                try:
+                    from src.data.sentiment_analyzer import SentimentAnalyzer
+                    analyzer = SentimentAnalyzer()
+                    news_summary = await asyncio.wait_for(
+                        analyzer.get_market_sentiment_summary(market.title),
+                        timeout=30.0
+                    )
+                    estimated_search_cost = analyzer.total_cost
+                    logger.info(f"Sentiment pipeline returned for {market.market_id}")
+                except Exception as e:
+                    logger.warning(f"Sentiment pipeline failed for {market.market_id}: {e}, falling back to xAI search")
+                    news_summary = None
+                    estimated_search_cost = 0.0
+
+            if not sentiment_analysis or news_summary is None:
+                # Fall back to xAI search
+                try:
+                    news_summary = await asyncio.wait_for(
+                        xai_client.search(market.title, max_length=200),
+                        timeout=15.0
+                    )
+                    estimated_search_cost = 0.02
+                except asyncio.TimeoutError:
+                    logger.warning(f"Search timeout for market {market.market_id}, using fallback")
+                    news_summary = f"Search timeout. Analyzing {market.title} based on market data only."
+                    estimated_search_cost = 0.0
+                except Exception as e:
+                    logger.warning(f"Search failed for market {market.market_id}, continuing without news", error=str(e))
+                    news_summary = f"News search unavailable. Analysis based on market data only."
+                    estimated_search_cost = 0.0
 
         total_analysis_cost += estimated_search_cost
-        
+
         # Check if we're approaching cost limits before making the decision
         if total_analysis_cost > settings.trading.max_ai_cost_per_decision:
             logger.warning(f"Analysis cost ${total_analysis_cost:.3f} exceeds per-decision limit. Skipping.")
-            # Still record the analysis attempt
             await db_manager.record_market_analysis(
                 market.market_id, "SKIP", 0.0, total_analysis_cost, "cost_limited"
             )
             return None
-        
-        decision = await xai_client.get_trading_decision(
-            market_data=market_data,
-            portfolio_data=portfolio_data,
-            news_summary=news_summary,
-        )
 
-        # Estimate decision cost (this should come from the XAI client in the future)
-        estimated_decision_cost = 0.015  # Rough estimate
-        total_analysis_cost += estimated_decision_cost
+        # --- Multi-Agent Ensemble Decision (when enabled) ---
+        decision = None
+        if multi_model_ensemble and model_router:
+            logger.info(f"Running multi-agent ensemble for {market.market_id}")
+            ensemble_result = await _run_ensemble_decision(
+                market_data=market_data,
+                news_summary=news_summary,
+                model_router=model_router,
+            )
+            if ensemble_result:
+                from src.clients.xai_client import TradingDecision
+                decision = TradingDecision(
+                    action=ensemble_result.get("action", "SKIP"),
+                    side=ensemble_result.get("side", "YES"),
+                    confidence=float(ensemble_result.get("confidence", 0.0)),
+                    limit_price=int(ensemble_result.get("limit_price", 50)),
+                )
+                # Attach reasoning for rationale
+                decision.reasoning = ensemble_result.get("reasoning", "Multi-agent ensemble decision")
+                estimated_decision_cost = 0.10  # Ensemble uses multiple models
+                total_analysis_cost += estimated_decision_cost
+            else:
+                logger.info("Ensemble returned no decision, falling back to single-model")
+
+        # --- Fallback: Single-model decision ---
+        if decision is None:
+            decision = await xai_client.get_trading_decision(
+                market_data=market_data,
+                portfolio_data=portfolio_data,
+                news_summary=news_summary,
+            )
+            estimated_decision_cost = 0.015
+            total_analysis_cost += estimated_decision_cost
 
         if not decision:
             logger.warning(f"No decision was made for market {market.market_id}. Skipping.")

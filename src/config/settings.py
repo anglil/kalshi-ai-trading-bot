@@ -19,7 +19,45 @@ class APIConfig:
     kalshi_base_url: str = "https://api.elections.kalshi.com"  # Updated to new API endpoint
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     xai_api_key: str = field(default_factory=lambda: os.getenv("XAI_API_KEY", ""))
+    openrouter_api_key: str = field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
     openai_base_url: str = "https://api.openai.com/v1"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+
+@dataclass
+class EnsembleConfig:
+    """Multi-model ensemble configuration."""
+    enabled: bool = True
+    # Model roster for ensemble decisions
+    models: Dict[str, Dict] = field(default_factory=lambda: {
+        "grok-4-1-fast-reasoning": {"provider": "xai", "role": "forecaster", "weight": 0.30},
+        "anthropic/claude-sonnet-4.5": {"provider": "openrouter", "role": "news_analyst", "weight": 0.20},
+        "openai/o3": {"provider": "openrouter", "role": "bull_researcher", "weight": 0.20},
+        "google/gemini-3-pro-preview": {"provider": "openrouter", "role": "bear_researcher", "weight": 0.15},
+        "deepseek/deepseek-v3.2": {"provider": "openrouter", "role": "risk_manager", "weight": 0.15},
+    })
+    min_models_for_consensus: int = 3
+    disagreement_threshold: float = 0.25  # Std dev above this = low confidence
+    parallel_requests: bool = True
+    debate_enabled: bool = True
+    calibration_tracking: bool = True
+    max_ensemble_cost: float = 0.50  # Max cost per ensemble decision
+
+
+@dataclass
+class SentimentConfig:
+    """News and sentiment analysis configuration."""
+    enabled: bool = True
+    rss_feeds: List[str] = field(default_factory=lambda: [
+        "https://feeds.reuters.com/reuters/topNews",
+        "https://feeds.reuters.com/reuters/businessNews",
+        "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+        "https://feeds.bbci.co.uk/news/business/rss.xml",
+    ])
+    sentiment_model: str = "google/gemini-3-flash-preview"  # Fast/cheap for sentiment
+    cache_ttl_minutes: int = 30
+    max_articles_per_source: int = 10
+    relevance_threshold: float = 0.3
 
 
 # Trading strategy configuration - INCREASED AGGRESSIVENESS
@@ -41,8 +79,8 @@ class TradingConfig:
     scan_interval_seconds: int = 30      # DECREASED: Scan more frequently (was 60, now 30)
     
     # AI model configuration
-    primary_model: str = "grok-4" # DO NOT CHANGE THIS UNDER ANY CIRCUMSTANCES
-    fallback_model: str = "grok-3"  # Fallback to available model
+    primary_model: str = "grok-4-1-fast-reasoning"  # Latest xAI frontier reasoning model
+    fallback_model: str = "grok-4-1-fast-non-reasoning"  # Fallback to non-reasoning variant
     ai_temperature: float = 0  # Lower temperature for more consistent JSON output
     ai_max_tokens: int = 8000    # Reasonable limit for reasoning models (grok-4 works better with 8000)
     
@@ -184,8 +222,9 @@ performance_monitoring: bool = True     # Enable performance monitoring
 # === ADVANCED FEATURES ===
 # Cutting-edge features for maximum performance
 cross_market_arbitrage: bool = False    # Enable when arbitrage module ready
-multi_model_ensemble: bool = False      # Use multiple AI models (future)
-sentiment_analysis: bool = False        # News sentiment analysis (future)
+multi_model_ensemble: bool = True       # Multi-model ensemble decisions (ENABLED)
+sentiment_analysis: bool = True         # News sentiment analysis (ENABLED)
+websocket_streaming: bool = True        # WebSocket real-time data (ENABLED)
 options_strategies: bool = False        # Complex options strategies (future)
 algorithmic_execution: bool = False     # Smart order execution (future)
 
@@ -196,21 +235,23 @@ class Settings:
     api: APIConfig = field(default_factory=APIConfig)
     trading: TradingConfig = field(default_factory=TradingConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    
+    ensemble: EnsembleConfig = field(default_factory=EnsembleConfig)
+    sentiment: SentimentConfig = field(default_factory=SentimentConfig)
+
     def validate(self) -> bool:
         """Validate configuration settings."""
         if not self.api.kalshi_api_key:
             raise ValueError("KALSHI_API_KEY environment variable is required")
-        
+
         if not self.api.xai_api_key:
             raise ValueError("XAI_API_KEY environment variable is required")
-        
+
         if self.trading.max_position_size_pct <= 0 or self.trading.max_position_size_pct > 100:
             raise ValueError("max_position_size_pct must be between 0 and 100")
-        
+
         if self.trading.min_confidence_to_trade <= 0 or self.trading.min_confidence_to_trade > 1:
             raise ValueError("min_confidence_to_trade must be between 0 and 1")
-        
+
         return True
 
 

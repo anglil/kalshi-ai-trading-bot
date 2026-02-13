@@ -712,7 +712,7 @@ Required format:
         # Use configured token limits from settings
         from src.config.settings import settings
         if max_tokens is None:
-            if model_to_use == "grok-4":
+            if model_to_use == settings.trading.primary_model:
                 max_tokens = settings.trading.ai_max_tokens  # Use configured limit (8000)
             else:
                 max_tokens = self.max_tokens
@@ -780,7 +780,7 @@ Required format:
                         else:
                             # If we've exhausted token scaling, try fallback model
                             if model_to_use == "grok-4" and attempt == max_retries - 1:
-                                self.logger.warning(f"Grok-4 consistently hitting token limits, trying fallback model")
+                                self.logger.warning(f"{model_to_use} consistently hitting token limits, trying fallback model")
                                 fallback_result = await self._try_fallback_model(messages, temperature, original_max_tokens)
                                 if fallback_result:
                                     return fallback_result
@@ -798,8 +798,8 @@ Required format:
                         continue
                     else:
                         # Try fallback model as last resort
-                        if model_to_use == "grok-4":
-                            self.logger.warning(f"Grok-4 failed after all retries, trying fallback model")
+                        if model_to_use == settings.trading.primary_model:
+                            self.logger.warning(f"{model_to_use} failed after all retries, trying fallback model")
                             fallback_result = await self._try_fallback_model(messages, temperature, original_max_tokens)
                             if fallback_result:
                                 return fallback_result
@@ -849,9 +849,9 @@ Required format:
                 )
                 
                 if attempt == max_retries - 1:
-                    # Last attempt failed - try fallback model if using Grok-4
-                    if model_to_use == "grok-4":
-                        self.logger.warning(f"Grok-4 failed with error, trying fallback model: {str(e)}")
+                    # Last attempt failed - try fallback model if using primary model
+                    if model_to_use == settings.trading.primary_model:
+                        self.logger.warning(f"{model_to_use} failed with error, trying fallback model: {str(e)}")
                         fallback_result = await self._try_fallback_model(messages, temperature, original_max_tokens)
                         if fallback_result:
                             return fallback_result
