@@ -182,30 +182,23 @@ python beast_mode_bot.py --dashboard  # Dashboard mode
 ```
 kalshi-ai-trading-bot/
 |-- beast_mode_bot.py          # Main bot entry point (BeastModeBot class)
-|-- beast_mode_dashboard.py    # Dashboard module (imported by bot)
 |-- cli.py                     # Unified CLI: run, dashboard, status, health, backtest
 |-- pyproject.toml             # PEP 621 project metadata and build config
-|-- setup.py                   # Legacy setup script
-|-- run_tests.py               # Test runner
 |-- requirements.txt           # Pinned dependencies
 |-- env.template               # Environment variable template
 |
 |-- src/
-|   |-- agents/                # Base agent framework
-|   |-- clients/               # API clients (Kalshi, xAI, OpenAI/OpenRouter)
+|   |-- agents/                # Multi-agent ensemble (forecaster, bull/bear, risk, trader)
+|   |-- clients/               # API clients (Kalshi, xAI, OpenRouter, WebSocket)
 |   |-- config/                # Settings and trading parameters
-|   |-- events/                # Internal event bus
+|   |-- data/                  # News aggregation and sentiment analysis
+|   |-- events/                # Async event bus for real-time streaming
 |   |-- jobs/                  # Core pipeline: ingest, decide, execute, track, evaluate
 |   |-- strategies/            # Market making, portfolio optimization, quick flip
 |   +-- utils/                 # Database, logging, prompts, risk helpers
 |
-|-- scripts/                   # Utility and diagnostic scripts
-|   |-- analyze_performance.py
-|   |-- cost_monitor.py
-|   |-- portfolio_health_check.py
-|   |-- sync_positions.py
-|   +-- ...                    # (19 scripts total)
-|
+|-- scripts/                   # Utility and diagnostic scripts (20 scripts)
+|-- docs/                      # Additional documentation
 +-- tests/                     # Pytest test suite
 ```
 

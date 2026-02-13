@@ -57,7 +57,7 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
 
     # Prefer the dedicated dashboard launch script if it exists.
     dashboard_script = Path(__file__).parent / "scripts" / "launch_dashboard.py"
-    beast_dashboard = Path(__file__).parent / "beast_mode_dashboard.py"
+    beast_dashboard = Path(__file__).parent / "scripts" / "beast_mode_dashboard.py"
 
     if dashboard_script.exists():
         subprocess.run([sys.executable, str(dashboard_script)], check=False)
