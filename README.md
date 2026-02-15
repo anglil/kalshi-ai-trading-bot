@@ -145,8 +145,19 @@ Required variables in `.env`:
 | `OPENROUTER_API_KEY` | OpenRouter key for ensemble models |
 | `OPENAI_API_KEY` | OpenAI key (optional fallback) |
 
-You must also place your Kalshi private key file at `kalshi_private_key` in the
-project root (this file is git-ignored).
+You must also place your Kalshi private key file as `kalshi_private_key` (no file
+extension) in the project root. Download it from
+[Kalshi Settings → API](https://kalshi.com/account/settings). This file is
+git-ignored.
+
+### Initialize the Database
+
+```bash
+python -m src.utils.database
+```
+
+> **Note:** Running `python src/utils/database.py` directly may fail with
+> `ModuleNotFoundError: No module named 'src'`. Always use the `-m` flag.
 
 ### Running
 
