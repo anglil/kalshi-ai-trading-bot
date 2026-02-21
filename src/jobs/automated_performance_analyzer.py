@@ -26,7 +26,6 @@ from src.clients.xai_client import XAIClient
 from src.utils.database import DatabaseManager, Position, TradeLog
 from src.config.settings import settings
 from src.utils.logging_setup import get_trading_logger
-from xai_sdk.chat import user as xai_user
 
 
 class Priority(Enum):
@@ -421,7 +420,7 @@ Be concise and actionable. Focus on the top 3 priorities.
 
         try:
             # Use raw completion to get unprocessed text
-            messages = [xai_user(analysis_prompt)]
+            messages = [{"role": "user", "content": analysis_prompt}]
             response_content, cost = await self.xai_client._make_completion_request(
                 messages, 
                 max_tokens=3000,

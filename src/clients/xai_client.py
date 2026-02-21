@@ -15,9 +15,7 @@ import os
 import re
 from json_repair import repair_json
 
-from xai_sdk import AsyncClient
-from xai_sdk.chat import user as xai_user
-from xai_sdk.search import SearchParameters
+from openai import AsyncOpenAI
 
 from src.config.settings import settings
 from src.utils.logging_setup import TradingLoggerMixin, log_error_with_context
@@ -46,23 +44,28 @@ class DailyUsageTracker:
 
 class XAIClient(TradingLoggerMixin):
     """
-    xAI client for AI-powered trading decisions.
-    Uses Grok models for market analysis and trading strategy.
+    AI client for trading decisions.
+    Now uses Gemini models via Google AI Studio's OpenAI-compatible API.
     """
     
     def __init__(self, api_key: Optional[str] = None, db_manager=None):
         """
-        Initialize xAI client.
+        Initialize AI client with Google AI Studio (Gemini) backend.
         
         Args:
-            api_key: xAI API key (defaults to settings)
+            api_key: Gemini API key (defaults to settings)
             db_manager: Optional DatabaseManager for logging queries
         """
-        self.api_key = api_key or settings.api.xai_api_key
+        self.api_key = api_key or settings.api.gemini_api_key or settings.api.openrouter_api_key
         self.db_manager = db_manager
         
-        # Initialize xAI async client with proper timeout for reasoning models
-        self.client = AsyncClient(api_key=self.api_key, timeout=3600.0)  # 3600s as recommended by xAI docs
+        # Initialize OpenAI-compatible client pointing at Google AI Studio
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            timeout=120.0,
+            max_retries=0,  # We handle retries ourselves
+        )
         
         # Model configuration
         self.primary_model = settings.trading.primary_model
@@ -83,7 +86,7 @@ class XAIClient(TradingLoggerMixin):
         self.api_exhausted_until = None
         
         self.logger.info(
-            "xAI client initialized",
+            "AI client initialized (Gemini via Google AI Studio)",
             primary_model=self.primary_model,
             logging_enabled=bool(db_manager),
             daily_limit=self.daily_tracker.daily_limit,
@@ -202,14 +205,20 @@ class XAIClient(TradingLoggerMixin):
         self._save_daily_tracker()
 
     def _is_resource_exhausted_error(self, error: Exception) -> bool:
-        """Check if error is due to resource exhaustion."""
+        """Check if error is due to permanent resource exhaustion (not temp rate limits)."""
         error_str = str(error).lower()
-        return any(indicator in error_str for indicator in [
-            "resource_exhausted",
+        # Only mark as truly exhausted for billing/credit issues, not per-minute rate limits
+        # Gemini free tier returns "quota" errors for per-minute limits — those are temporary
+        is_permanent = any(indicator in error_str for indicator in [
             "credits",
             "spending limit",
-            "quota"
+            "billing",
+            "payment required",
         ])
+        # Exclude temporary rate limits (which Gemini uses)
+        if "quota" in error_str and "retry" in error_str:
+            return False  # Temporary rate limit, not permanent exhaustion
+        return is_permanent
 
     async def _log_query(
         self,
@@ -249,8 +258,8 @@ class XAIClient(TradingLoggerMixin):
 
     async def search(self, query: str, max_length: int = 300) -> str:
         """
-        Perform a search using proper xAI Live Search functionality.
-        Implements intelligent query processing, caching, and fallbacks.
+        Perform a search using Gemini for context generation.
+        Uses the AI model to provide relevant context based on its training data.
         """
         try:
             # Process and optimize the search query
@@ -266,44 +275,26 @@ class XAIClient(TradingLoggerMixin):
                 self._search_cache = {}
             
             self.logger.debug(
-                "Starting xAI live search",
+                "Starting AI-powered search",
                 original_query=query[:50],
                 optimized_query=optimized_query[:50],
                 max_length=max_length
             )
             
-            # Use synchronous client for search to avoid async issues
-            from xai_sdk import Client
-            sync_client = Client(api_key=self.api_key)
-            
-            # Create chat with search parameters
-            chat = sync_client.chat.create(
-                model=self.primary_model,
-                search_parameters=SearchParameters(
-                    mode="auto",  # Let model decide when to search
-                    return_citations=True,  # Get source citations
-                ),
-                temperature=0.3,  # Lower temperature for more factual responses
-                max_tokens=min(2000, self.max_tokens)  # Higher limit for search
-            )
-            
-            # Create focused search prompt
+            # Use Gemini completion for context generation
             search_prompt = self._create_search_prompt(optimized_query, max_length)
-            chat.append(xai_user(search_prompt))
             
-            # Sample response (synchronous)
             start_time = time.time()
             try:
-                response = chat.sample()
+                response = await self.client.chat.completions.create(
+                    model=self.primary_model,
+                    messages=[{"role": "user", "content": search_prompt}],
+                    temperature=0.3,
+                    max_tokens=min(2000, self.max_tokens),
+                )
                 processing_time = time.time() - start_time
                 
-                # Handle potential coroutine return (SDK bug)
-                if hasattr(response, '__await__'):
-                    # If it's a coroutine, await it
-                    response = await response
-                
-                # Check for valid response
-                if not response or not hasattr(response, 'content') or not response.content or not response.content.strip():
+                if not response.choices or not response.choices[0].message.content:
                     self.logger.warning(
                         "Search returned empty result",
                         query=optimized_query[:50],
@@ -311,31 +302,35 @@ class XAIClient(TradingLoggerMixin):
                     )
                     return self._get_fallback_context(query, max_length)
                 
-                # Process successful response
-                search_result = self._process_search_response(response, query, processing_time, max_length)
+                search_result = self._truncate_news_summary(response.choices[0].message.content, max_length)
+                search_result += "\n[Based on AI model knowledge]"
                 
                 # Cache the result
                 cache_key = f"{optimized_query[:50]}:{max_length}"
-                if len(self._search_cache) < 100:  # Limit cache size
+                if len(self._search_cache) < 100:
                     self._search_cache[cache_key] = search_result
+                
+                self.logger.info(
+                    "AI search completed",
+                    query=optimized_query[:50],
+                    processing_time=round(processing_time, 2)
+                )
                 
                 return search_result
                 
             except Exception as sample_error:
                 self.logger.warning(
-                    "Search sampling failed", 
+                    "Search failed", 
                     query=optimized_query[:50],
                     error=str(sample_error),
-                    error_type=type(sample_error).__name__
                 )
                 return self._get_fallback_context(query, max_length)
                 
         except Exception as e:
             self.logger.warning(
-                "Live search failed, using fallback",
+                "Search failed, using fallback",
                 query=query[:50],
                 error=str(e),
-                error_type=type(e).__name__
             )
             return self._get_fallback_context(query, max_length)
     
@@ -688,8 +683,7 @@ Required format:
         max_retries: int = 3
     ) -> Tuple[Optional[str], float]:
         """
-        Make a completion request with cost tracking and fallback model logic.
-        Uses the official xAI SDK pattern from docs.
+        Make a completion request via Google AI Studio's OpenAI-compatible API.
         """
         # Check daily limits first
         if not await self._check_daily_limits():
@@ -702,141 +696,82 @@ Required format:
                 self.logger.info("API exhausted - skipping request until reset")
                 return None, 0.0
             else:
-                # Reset exhaustion state - new day
                 self.is_api_exhausted = False
                 self.api_exhausted_until = None
         
         model_to_use = model or self.primary_model
         temperature = temperature if temperature is not None else self.temperature
         
-        # Use configured token limits from settings
         from src.config.settings import settings
         if max_tokens is None:
-            if model_to_use == settings.trading.primary_model:
-                max_tokens = settings.trading.ai_max_tokens  # Use configured limit (8000)
-            else:
-                max_tokens = self.max_tokens
+            max_tokens = settings.trading.ai_max_tokens
         
-        original_max_tokens = max_tokens  # Store original for fallback logic
+        # Convert xAI SDK message format to OpenAI format if needed
+        openai_messages = []
+        for msg in messages:
+            if isinstance(msg, dict):
+                openai_messages.append(msg)
+            else:
+                # Handle xAI SDK message objects
+                openai_messages.append({"role": "user", "content": str(msg)})
         
         for attempt in range(max_retries):
             try:
                 start_time = time.time()
                 
-                # Use the official xAI SDK pattern from docs - NO search parameters for regular completions
-                chat = self.client.chat.create(
+                response = await self.client.chat.completions.create(
                     model=model_to_use,
+                    messages=openai_messages,
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
-                
-                # Add all messages to the chat
-                for message in messages:
-                    chat.append(message)
-                
-                # Sample the response
-                response = await chat.sample()
-                response_content = response.content
                 
                 processing_time = time.time() - start_time
                 
-                # Log detailed response information for debugging
-                self.logger.debug(
-                    "Raw XAI response received",
-                    model=model_to_use,
-                    response_length=len(response_content) if response_content else 0,
-                    response_preview=response_content[:200] if response_content else "EMPTY",
-                    processing_time=processing_time,
-                    attempt=attempt + 1,
-                    finish_reason=getattr(response, 'finish_reason', 'unknown'),
-                    reasoning_tokens=getattr(response.usage, 'reasoning_tokens', 0) if hasattr(response, 'usage') else 0,
-                    total_tokens=getattr(response.usage, 'total_tokens', 0) if hasattr(response, 'usage') else 0
-                )
-                
-                # Check for empty response - but be more lenient for reasoning models
-                if not response_content or not response_content.strip():
-                    # Check if this is a reasoning model issue (has reasoning tokens but no content)
-                    has_reasoning_tokens = (hasattr(response, 'usage') and 
-                                          hasattr(response.usage, 'reasoning_tokens') and 
-                                          response.usage.reasoning_tokens > 0)
-                    
-                    if has_reasoning_tokens and getattr(response, 'finish_reason', None) == 'REASON_MAX_LEN':
-                        # Reasoning model hit token limit - retry with more tokens
-                        self.logger.warning(
-                            f"Reasoning model hit token limit on attempt {attempt + 1}, retrying with more tokens",
-                            model=model_to_use,
-                            reasoning_tokens=response.usage.reasoning_tokens if hasattr(response, 'usage') else 0,
-                            max_tokens=max_tokens
-                        )
-                        
-                        # Scale tokens more aggressively, using configured maximum
-                        if attempt == 0:
-                            max_tokens = min(max_tokens * 2, settings.trading.ai_max_tokens)  # Use configured max
-                        elif attempt == 1:
-                            max_tokens = settings.trading.ai_max_tokens  # Use full configured limit
-                        
-                        if attempt < max_retries - 1 and max_tokens > original_max_tokens:
-                            continue
-                        else:
-                            # If we've exhausted token scaling, try fallback model
-                            if model_to_use == "grok-4" and attempt == max_retries - 1:
-                                self.logger.warning(f"{model_to_use} consistently hitting token limits, trying fallback model")
-                                fallback_result = await self._try_fallback_model(messages, temperature, original_max_tokens)
-                                if fallback_result:
-                                    return fallback_result
-                    
+                if not response.choices or not response.choices[0].message.content:
                     self.logger.warning(
-                        f"Empty response received on attempt {attempt + 1}",
+                        f"Empty response on attempt {attempt + 1}",
                         model=model_to_use,
                         processing_time=processing_time,
-                        attempt=attempt + 1,
-                        max_retries=max_retries,
-                        finish_reason=getattr(response, 'finish_reason', 'unknown')
                     )
                     if attempt < max_retries - 1:
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                        await asyncio.sleep(2 ** attempt)
                         continue
-                    else:
-                        # Try fallback model as last resort
-                        if model_to_use == settings.trading.primary_model:
-                            self.logger.warning(f"{model_to_use} failed after all retries, trying fallback model")
-                            fallback_result = await self._try_fallback_model(messages, temperature, original_max_tokens)
-                            if fallback_result:
-                                return fallback_result
-                        
-                        raise ValueError(f"Model {model_to_use} returned empty response after {max_retries} attempts")
+                    # Try fallback
+                    if model_to_use == settings.trading.primary_model:
+                        fallback_result = await self._try_fallback_model(openai_messages, temperature, max_tokens)
+                        if fallback_result:
+                            return fallback_result
+                    return None, 0.0
                 
-                # Estimate cost (rough estimation for non-search requests)
-                estimated_tokens = getattr(response.usage, 'total_tokens', len(response_content) // 4) if hasattr(response, 'usage') else len(response_content) // 4
-                cost = estimated_tokens * 0.00001
+                response_content = response.choices[0].message.content
+                
+                # Track cost (near-zero on free tier)
+                input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
+                output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
+                cost = (input_tokens + output_tokens) * 0.000001  # Near-zero for free tier
                 
                 self.total_cost += cost
                 self.request_count += 1
-                
-                # Update daily cost tracking
                 self._update_daily_cost(cost)
                 
                 self.logger.debug(
-                    "xAI completion request successful",
+                    "Gemini completion successful",
                     model=model_to_use,
-                    estimated_tokens=estimated_tokens,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
                     cost=cost,
-                    processing_time=processing_time,
+                    processing_time=round(processing_time, 2),
                     attempt=attempt + 1
                 )
                 
                 return response_content, cost
                 
             except Exception as e:
-                # Check for resource exhausted errors first
                 if self._is_resource_exhausted_error(e):
                     await self._handle_resource_exhausted_error(str(e))
                     return None, 0.0
                 
-                # Check for specific gRPC error indicating deadline exceeded
-                is_deadline_error = "DEADLINE_EXCEEDED" in str(e)
-                
-                # Check for specific rate limit errors
                 is_rate_limit = any(indicator in str(e).lower() for indicator in ["rate limit", "quota", "429", "too many"])
                 
                 self.logger.warning(
@@ -844,26 +779,24 @@ Required format:
                     model=model_to_use,
                     attempt=attempt + 1,
                     max_retries=max_retries,
-                    is_deadline_error=is_deadline_error,
                     is_rate_limit=is_rate_limit
                 )
                 
                 if attempt == max_retries - 1:
-                    # Last attempt failed - try fallback model if using primary model
                     if model_to_use == settings.trading.primary_model:
                         self.logger.warning(f"{model_to_use} failed with error, trying fallback model: {str(e)}")
-                        fallback_result = await self._try_fallback_model(messages, temperature, original_max_tokens)
+                        fallback_result = await self._try_fallback_model(openai_messages, temperature, max_tokens)
                         if fallback_result:
                             return fallback_result
-                    
                     self.logger.error(f"Error in get_completion: {str(e)}")
-                    return None, 0.0  # Return None instead of raising
+                    return None, 0.0
                 
-                # Add delay before retry
-                await asyncio.sleep(2 ** attempt)
+                delay = 2 ** attempt
+                if is_rate_limit:
+                    delay *= 2
+                await asyncio.sleep(delay)
         
-        # Should not reach here
-        raise ValueError("Unexpected end of retry loop")
+        return None, 0.0
 
     async def _try_fallback_model(
         self,
@@ -873,14 +806,6 @@ Required format:
     ) -> Optional[Tuple[str, float]]:
         """
         Try using the fallback model when the primary model fails.
-        
-        Args:
-            messages: The messages to send to the fallback model
-            temperature: Temperature setting
-            max_tokens: Max tokens for the fallback model
-            
-        Returns:
-            Tuple of (response_content, cost) if successful, None if failed
         """
         try:
             from src.config.settings import settings
@@ -888,28 +813,20 @@ Required format:
             
             self.logger.info(f"Attempting fallback to {fallback_model}")
             
-            # Use smaller token limit for fallback model to be conservative
             fallback_max_tokens = min(max_tokens or self.max_tokens, 4000)
             
-            # Try the fallback model with a single attempt
-            chat = self.client.chat.create(
+            response = await self.client.chat.completions.create(
                 model=fallback_model,
+                messages=messages,
                 temperature=temperature or self.temperature,
-                max_tokens=fallback_max_tokens
+                max_tokens=fallback_max_tokens,
             )
             
-            # Add all messages to the chat
-            for message in messages:
-                chat.append(message)
-            
-            # Sample the response
-            response = await chat.sample()
-            response_content = response.content
-            
-            if response_content and response_content.strip():
-                # Estimate cost for fallback model
-                estimated_tokens = getattr(response.usage, 'total_tokens', len(response_content) // 4) if hasattr(response, 'usage') else len(response_content) // 4
-                cost = estimated_tokens * 0.00001  # Same cost estimation
+            if response.choices and response.choices[0].message.content:
+                response_content = response.choices[0].message.content
+                input_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
+                output_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
+                cost = (input_tokens + output_tokens) * 0.000001
                 
                 self.total_cost += cost
                 self.request_count += 1
@@ -917,7 +834,6 @@ Required format:
                 self.logger.info(
                     f"✅ Fallback model {fallback_model} succeeded",
                     response_length=len(response_content),
-                    estimated_tokens=estimated_tokens,
                     cost=cost
                 )
                 
@@ -944,7 +860,7 @@ Required format:
         Returns the raw response text or None if failed/exhausted.
         """
         try:
-            messages = [xai_user(prompt)]
+            messages = [{"role": "user", "content": prompt}]
             response_content, cost = await self._make_completion_request(
                 messages, 
                 max_tokens=max_tokens, 

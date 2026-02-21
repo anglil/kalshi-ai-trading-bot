@@ -27,32 +27,27 @@ from src.utils.logging_setup import TradingLoggerMixin
 # The router will try them in order until one succeeds.
 CAPABILITY_MAP: Dict[str, List[Tuple[str, str]]] = {
     "fast": [
-        ("google/gemini-3-flash-preview", "openrouter"),
-        ("grok-4-1-fast-reasoning", "xai"),
+        ("gemini-3-flash-preview", "openrouter"),
+        ("gemini-2.5-flash", "openrouter"),
     ],
     "cheap": [
-        ("deepseek/deepseek-v3.2", "openrouter"),
-        ("google/gemini-3-flash-preview", "openrouter"),
+        ("gemini-2.5-flash", "openrouter"),
+        ("gemini-3-flash-preview", "openrouter"),
     ],
     "reasoning": [
-        ("grok-4-1-fast-reasoning", "xai"),
-        ("openai/o3", "openrouter"),
-        ("anthropic/claude-sonnet-4.5", "openrouter"),
+        ("gemini-3-flash-preview", "openrouter"),
+        ("gemini-2.5-flash", "openrouter"),
     ],
     "balanced": [
-        ("anthropic/claude-sonnet-4.5", "openrouter"),
-        ("openai/o3", "openrouter"),
-        ("grok-4-1-fast-reasoning", "xai"),
+        ("gemini-3-flash-preview", "openrouter"),
+        ("gemini-2.5-flash", "openrouter"),
     ],
 }
 
-# Full fleet: used when we need a fallback chain that spans all providers.
+# Full fleet: free-tier Gemini models via Google AI Studio
 FULL_FLEET: List[Tuple[str, str]] = [
-    ("grok-4-1-fast-reasoning", "xai"),
-    ("anthropic/claude-sonnet-4.5", "openrouter"),
-    ("openai/o3", "openrouter"),
-    ("google/gemini-3-pro-preview", "openrouter"),
-    ("deepseek/deepseek-v3.2", "openrouter"),
+    ("gemini-3-flash-preview", "openrouter"),
+    ("gemini-2.5-flash", "openrouter"),
 ]
 
 
@@ -181,13 +176,16 @@ class ModelRouter(TradingLoggerMixin):
 
     def _infer_provider(self, model: str) -> str:
         """Determine which provider owns a model string."""
+        # All models now route through Google AI Studio ("openrouter" label)
+        if model.startswith("gemini"):
+            return "openrouter"
         # OpenRouter models use a slash-delimited namespace
         if "/" in model:
             return "openrouter"
-        # Grok models go through XAI
+        # Grok models go through XAI (legacy, not used)
         if model.startswith("grok"):
             return "xai"
-        # Default: try openrouter (it can proxy many models)
+        # Default: try openrouter (Google AI Studio)
         return "openrouter"
 
     def _resolve_targets(

@@ -27,34 +27,32 @@ from src.utils.logging_setup import TradingLoggerMixin, log_error_with_context
 # ---------------------------------------------------------------------------
 
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
-    "anthropic/claude-sonnet-4.5": {
-        "input_per_1k": 0.003,
-        "output_per_1k": 0.015,
+    "gemini-3.1-pro-preview": {
+        "input_per_1k": 0.0001,  # Near-zero on free tier
+        "output_per_1k": 0.0005,
     },
-    "openai/o3": {
-        "input_per_1k": 0.002,
-        "output_per_1k": 0.008,
+    "gemini-3-pro-preview": {
+        "input_per_1k": 0.0001,
+        "output_per_1k": 0.0005,
     },
-    "google/gemini-3-pro-preview": {
-        "input_per_1k": 0.002,
-        "output_per_1k": 0.012,
+    "gemini-3-flash-preview": {
+        "input_per_1k": 0.00005,
+        "output_per_1k": 0.0002,
     },
-    "google/gemini-3-flash-preview": {
-        "input_per_1k": 0.0005,
-        "output_per_1k": 0.003,
+    "gemini-2.5-pro": {
+        "input_per_1k": 0.0001,
+        "output_per_1k": 0.0005,
     },
-    "deepseek/deepseek-v3.2": {
-        "input_per_1k": 0.00025,
-        "output_per_1k": 0.00038,
+    "gemini-2.5-flash": {
+        "input_per_1k": 0.00005,
+        "output_per_1k": 0.0002,
     },
 }
 
 # Ordered fallback chain -- if the requested model fails, try the next one.
 DEFAULT_FALLBACK_ORDER: List[str] = [
-    "anthropic/claude-sonnet-4.5",
-    "openai/o3",
-    "google/gemini-3-pro-preview",
-    "deepseek/deepseek-v3.2",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
 ]
 
 
@@ -102,7 +100,7 @@ class OpenRouterClient(TradingLoggerMixin):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        default_model: str = "anthropic/claude-sonnet-4",
+        default_model: str = "gemini-3-flash-preview",
         db_manager: Any = None,
     ):
         self.api_key = api_key or settings.api.openrouter_api_key
