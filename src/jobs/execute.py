@@ -37,14 +37,26 @@ async def execute_position(
     if live_mode:
         try:
             client_order_id = str(uuid.uuid4())
-            order_response = await kalshi_client.place_order(
-                ticker=position.market_id,
-                client_order_id=client_order_id,
-                side=position.side.lower(),
-                action="buy",
-                count=position.quantity,
-                type_="market"
-            )
+            
+            # Kalshi API requires a price even for "market" orders.
+            # Use limit order at 99¢ (YES) or 99¢ (NO) to simulate market order
+            # with maximum willingness to pay.
+            side_lower = position.side.lower()
+            order_kwargs = {
+                "ticker": position.market_id,
+                "client_order_id": client_order_id,
+                "side": side_lower,
+                "action": "buy",
+                "count": position.quantity,
+                "type_": "limit",
+            }
+            # Provide the correct price param based on side
+            if side_lower == "yes":
+                order_kwargs["yes_price"] = 99  # 99 cents = effectively market order
+            else:
+                order_kwargs["no_price"] = 99   # 99 cents = effectively market order
+            
+            order_response = await kalshi_client.place_order(**order_kwargs)
             
             # For a market order, the fill price is not guaranteed.
             # A more robust implementation would query the /fills endpoint
