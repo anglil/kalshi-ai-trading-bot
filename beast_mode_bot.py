@@ -40,6 +40,7 @@ from src.config.settings import settings
 
 # Import Beast Mode components
 from src.strategies.unified_trading_system import run_unified_trading_system, TradingSystemConfig
+from src.strategies.weather_strategy import run_weather_trading_cycle
 from beast_mode_dashboard import BeastModeDashboard
 
 
@@ -91,7 +92,7 @@ class BeastModeBot:
             self.logger.info("🚀 BEAST MODE TRADING BOT STARTED")
             self.logger.info(f"📊 Trading Mode: {'LIVE' if self.live_mode else 'PAPER'}")
             self.logger.info(f"💰 Daily AI Budget: ${settings.trading.daily_ai_budget}")
-            self.logger.info(f"⚡ Features: Market Making + Portfolio Optimization + Dynamic Exits")
+            self.logger.info(f"⚡ Features: Weather Trading + Market Making + Portfolio Optimization + Dynamic Exits")
             
             # 🚨 CRITICAL FIX: Initialize database FIRST and wait for completion
             self.logger.info("🔧 Initializing database...")
@@ -124,6 +125,7 @@ class BeastModeBot:
             self.logger.info("🚀 Starting trading and monitoring tasks...")
             tasks = [
                 ingestion_task,  # Already started
+                asyncio.create_task(self._run_weather_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_trading_cycles(db_manager, kalshi_client, xai_client)),
                 asyncio.create_task(self._run_position_tracking(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_performance_evaluation(db_manager))
@@ -291,6 +293,29 @@ class BeastModeBot:
                 await asyncio.sleep(300)  # Run every 5 minutes
             except Exception as e:
                 self.logger.error(f"Error in performance evaluation: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_weather_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for weather-based trading (runs every 30 min)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(30)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                cycle += 1
+                self.logger.info(f"🌤️ Starting Weather Trading Cycle #{cycle}")
+                results = await run_weather_trading_cycle(kalshi_client, db_manager)
+                if results and results.get("orders_placed", 0) > 0:
+                    self.logger.info(
+                        f"✅ Weather Cycle #{cycle}: {results['orders_placed']} orders placed, "
+                        f"${results['total_position_value']:.2f} deployed"
+                    )
+                else:
+                    self.logger.info(f"📊 Weather Cycle #{cycle}: No trades this cycle")
+                # Run every 30 minutes
+                await asyncio.sleep(1800)
+            except Exception as e:
+                self.logger.error(f"Error in weather trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
 
     async def run(self):

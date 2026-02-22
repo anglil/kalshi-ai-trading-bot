@@ -147,10 +147,11 @@ class LoggingConfig:
 # These settings control the advanced multi-strategy trading system
 
 # === CAPITAL ALLOCATION ACROSS STRATEGIES ===
-# Allocate capital across different trading approaches — ARBITRAGE FOCUSED
-market_making_allocation: float = 0.10  # 10% for market making (spread profits)
-directional_allocation: float = 0.30    # 30% for directional trading (AI predictions) 
-arbitrage_allocation: float = 0.60      # 60% for arbitrage opportunities
+# Allocate capital across different trading approaches — WEATHER FOCUSED
+weather_allocation: float = 0.50         # 50% for weather trading (NWS forecast edge)
+market_making_allocation: float = 0.05   # 5% for market making (spread profits)
+directional_allocation: float = 0.20     # 20% for directional trading (AI predictions) 
+arbitrage_allocation: float = 0.25       # 25% for arbitrage opportunities
 
   # === PORTFOLIO OPTIMIZATION SETTINGS ===
 # Kelly Criterion is now the PRIMARY position sizing method (moved to TradingConfig)
