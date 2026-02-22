@@ -178,8 +178,7 @@ async def discover_weather_markets(
         # Kalshi weather tickers follow patterns like: KXHIGHNY-26FEB22
         markets_response = await kalshi_client.get_markets(
             limit=100,
-            series_ticker=station.kalshi_series,
-            status="active"
+            series_ticker=station.kalshi_series
         )
         
         markets = markets_response.get("markets", [])
@@ -189,8 +188,7 @@ async def discover_weather_markets(
             for prefix in [station.kalshi_series, f"KXTEMP{station.station_id[1:]}", f"HIGHTEMP"]:
                 markets_response = await kalshi_client.get_markets(
                     limit=100,
-                    series_ticker=prefix,
-                    status="active"
+                    series_ticker=prefix
                 )
                 markets = markets_response.get("markets", [])
                 if markets:
@@ -202,6 +200,10 @@ async def discover_weather_markets(
             ticker = market.get("ticker", "")
             title = market.get("title", "")
             
+            # Only consider active markets
+            if market.get("status") != "active":
+                continue
+                
             # Parse bracket from title like "Highest temperature in NYC 39°F to 40°F?"
             bracket = _parse_bracket_from_market(market)
             if bracket:
@@ -228,37 +230,29 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
     volume = market.get("volume", 0)
     
     # Parse temperature range from title
-    # Patterns: "39°F to 40°F", "39° to 40°", "below 38°", "above 47°"
-    # Also: "39°F or lower", "47°F or higher"
+    # Formats for Kalshi:
+    # "Will the high temp in Chicago be >33° on Feb 23, 2026?"
+    # "Will the high temp in Chicago be <26° on Feb 23, 2026?"
+    # "Will the high temp in Chicago be 32-33° on Feb 23, 2026?"
     
     low = None
     high = None
     
-    # Try "X°F to Y°F" or "X° to Y°" pattern
-    range_match = re.search(r'(\d+)\s*°?\s*F?\s*to\s*(\d+)\s*°?\s*F?', title, re.IGNORECASE)
-    if range_match:
-        low = int(range_match.group(1))
-        high = int(range_match.group(2))
+    # Try >X°
+    gt_match = re.search(r'>(\d+)°', title)
+    if gt_match:
+        low = int(gt_match.group(1)) + 1 # >40 means 41 or higher (assuming integers)
     else:
-        # Try "below X" / "X or lower" / "under X"
-        below_match = re.search(r'(?:below|under|at most|or lower)\s*(\d+)\s*°?\s*F?', title, re.IGNORECASE)
-        if below_match:
-            high = int(below_match.group(1))
+        # Try <X°
+        lt_match = re.search(r'<(\d+)°', title)
+        if lt_match:
+            high = int(lt_match.group(1)) - 1 # <33 means 32 or lower
         else:
-            # Also check "X°F or below"
-            below_match2 = re.search(r'(\d+)\s*°?\s*F?\s*(?:or below|or lower|or under)', title, re.IGNORECASE)
-            if below_match2:
-                high = int(below_match2.group(1))
-        
-        # Try "above X" / "X or higher" / "over X"
-        above_match = re.search(r'(?:above|over|at least|or higher)\s*(\d+)\s*°?\s*F?', title, re.IGNORECASE)
-        if above_match:
-            low = int(above_match.group(1))
-        else:
-            # Also check "X°F or above"
-            above_match2 = re.search(r'(\d+)\s*°?\s*F?\s*(?:or above|or higher|or over)', title, re.IGNORECASE)
-            if above_match2:
-                low = int(above_match2.group(1))
+            # Try X-Y°
+            range_match = re.search(r'(\d+)-(\d+)°', title)
+            if range_match:
+                low = int(range_match.group(1))
+                high = int(range_match.group(2))
     
     if low is None and high is None:
         # Couldn't parse bracket — skip
