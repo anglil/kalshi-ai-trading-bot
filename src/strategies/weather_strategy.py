@@ -282,6 +282,7 @@ def generate_weather_signals(
     min_edge: float = 0.08,
     max_position_pct: float = 0.05,
     kelly_fraction: float = 0.5,
+    rationale_prefix: str = "WEATHER",
 ) -> List[WeatherTradeSignal]:
     """
     Generate trade signals by comparing our probability estimates
@@ -392,7 +393,7 @@ def generate_weather_signals(
             shares=shares,
             city=city,
             rationale=(
-                f"WEATHER: {city} {bracket_desc} — "
+                f"{rationale_prefix}: {city} {bracket_desc} — "
                 f"NWS prob {our_prob:.0%} vs market {market_prob:.0%} = "
                 f"{edge:.0%} edge ({side}), net after fees: {net_edge:.0%}"
             ),
@@ -412,6 +413,7 @@ async def execute_weather_trade(
     signal: WeatherTradeSignal,
     kalshi_client: KalshiClient,
     db_manager: DatabaseManager,
+    strategy: str = "weather_forecast",
 ) -> bool:
     """
     Execute a single weather trade signal using a limit order.
@@ -457,7 +459,7 @@ async def execute_weather_trade(
                 live=True,
                 timestamp=datetime.now(),
                 rationale=signal.rationale,
-                strategy="weather_forecast",
+                strategy=strategy,
             )
             await db_manager.add_position(position)
             

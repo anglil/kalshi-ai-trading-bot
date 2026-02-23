@@ -40,7 +40,7 @@ from src.config.settings import settings
 
 # Import Beast Mode components
 from src.strategies.unified_trading_system import run_unified_trading_system, TradingSystemConfig
-from src.strategies.weather_strategy import run_weather_trading_cycle
+from src.strategies.weather_consensus import run_consensus_weather_cycle
 from beast_mode_dashboard import BeastModeDashboard
 
 
@@ -304,7 +304,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"🌤️ Starting Weather Trading Cycle #{cycle}")
-                results = await run_weather_trading_cycle(kalshi_client, db_manager)
+                results = await run_consensus_weather_cycle(kalshi_client, db_manager)
                 if results and results.get("orders_placed", 0) > 0:
                     self.logger.info(
                         f"✅ Weather Cycle #{cycle}: {results['orders_placed']} orders placed, "

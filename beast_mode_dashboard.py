@@ -173,38 +173,43 @@ class BeastModeDashboard:
         """Display performance by strategy type."""
         print("\n💡 STRATEGY BREAKDOWN")
         print("-" * 30)
-        
+
         try:
             positions = performance.get('current_positions', [])
-            
-            # Categorize positions (simplified - would need more logic for real categorization)
-            market_making_positions = 0
-            directional_positions = 0
-            total_mm_exposure = 0.0
-            total_dir_exposure = 0.0
-            
+
+            # Categorize positions by strategy
+            strategy_buckets = {
+                'weather_consensus': {'label': 'Weather Consensus', 'icon': '🌡️', 'count': 0, 'exposure': 0.0},
+                'weather_forecast':  {'label': 'Weather (NWS-only)', 'icon': '🌤️', 'count': 0, 'exposure': 0.0},
+                'market_making':     {'label': 'Market Making',      'icon': '🎯', 'count': 0, 'exposure': 0.0},
+                'directional':       {'label': 'Directional Trading','icon': '📈', 'count': 0, 'exposure': 0.0},
+            }
+
             for pos in positions:
-                if hasattr(pos, 'rationale') and pos.rationale:
-                    if 'market making' in pos.rationale.lower() or 'spread' in pos.rationale.lower():
-                        market_making_positions += 1
-                        total_mm_exposure += getattr(pos, 'entry_price', 0) * getattr(pos, 'quantity', 0)
-                    else:
-                        directional_positions += 1
-                        total_dir_exposure += getattr(pos, 'entry_price', 0) * getattr(pos, 'quantity', 0)
+                exposure = getattr(pos, 'entry_price', 0) * getattr(pos, 'quantity', 0)
+                strategy = getattr(pos, 'strategy', '') or ''
+                rationale = getattr(pos, 'rationale', '') or ''
+
+                if strategy == 'weather_consensus' or 'CONSENSUS' in rationale:
+                    bucket = 'weather_consensus'
+                elif strategy == 'weather_forecast' or rationale.startswith('WEATHER'):
+                    bucket = 'weather_forecast'
+                elif 'market making' in rationale.lower() or 'spread' in rationale.lower():
+                    bucket = 'market_making'
                 else:
-                    directional_positions += 1
-                    total_dir_exposure += getattr(pos, 'entry_price', 0) * getattr(pos, 'quantity', 0)
-            
-            print(f"🎯 Market Making:")
-            print(f"   Positions: {market_making_positions}")
-            print(f"   Exposure: ${total_mm_exposure:,.0f}")
-            
-            print(f"📈 Directional Trading:")
-            print(f"   Positions: {directional_positions}")
-            print(f"   Exposure: ${total_dir_exposure:,.0f}")
-            
+                    bucket = 'directional'
+
+                strategy_buckets[bucket]['count'] += 1
+                strategy_buckets[bucket]['exposure'] += exposure
+
+            for key, info in strategy_buckets.items():
+                if info['count'] > 0 or key in ('weather_consensus', 'directional'):
+                    print(f"{info['icon']} {info['label']}:")
+                    print(f"   Positions: {info['count']}")
+                    print(f"   Exposure: ${info['exposure']:,.0f}")
+
             print(f"🔮 Arbitrage: Coming Soon!")
-            
+
         except Exception as e:
             print(f"Error displaying strategy breakdown: {e}")
 
