@@ -179,15 +179,20 @@ async def place_profit_taking_orders(
             return results
         
         logger.info(f"📊 Checking {len(positions)} positions for profit-taking opportunities")
-        
+
         for position in positions:
             try:
                 results['positions_processed'] += 1
-                
+
+                # Skip weather positions — they hold to settlement
+                strategy = getattr(position, 'strategy', '') or ''
+                if strategy.startswith('weather'):
+                    continue
+
                 # Get current market data
                 market_response = await kalshi_client.get_market(position.market_id)
                 market_data = market_response.get('market', {})
-                
+
                 if not market_data:
                     logger.warning(f"Could not get market data for {position.market_id}")
                     continue
@@ -267,15 +272,20 @@ async def place_stop_loss_orders(
             return results
         
         logger.info(f"🛡️ Checking {len(positions)} positions for stop-loss protection")
-        
+
         for position in positions:
             try:
                 results['positions_processed'] += 1
-                
+
+                # Skip weather positions — they hold to settlement
+                strategy = getattr(position, 'strategy', '') or ''
+                if strategy.startswith('weather'):
+                    continue
+
                 # Get current market data
                 market_response = await kalshi_client.get_market(position.market_id)
                 market_data = market_response.get('market', {})
-                
+
                 if not market_data:
                     logger.warning(f"Could not get market data for {position.market_id}")
                     continue

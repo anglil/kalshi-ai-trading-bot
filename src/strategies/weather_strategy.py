@@ -461,6 +461,8 @@ async def execute_weather_trade(
             order_id = order_response["order"].get("order_id", client_order_id)
             
             # Record position in database
+            # Weather positions should hold to settlement — set wide exit levels
+            # to prevent the tracking job from closing them on intraday noise.
             position = Position(
                 market_id=signal.bracket.ticker,
                 side=signal.side,
@@ -470,6 +472,9 @@ async def execute_weather_trade(
                 timestamp=datetime.now(),
                 rationale=signal.rationale,
                 strategy=strategy,
+                stop_loss_price=0.01 if signal.side == "YES" else 0.99,  # effectively disabled
+                take_profit_price=0.99 if signal.side == "YES" else 0.01,  # let it ride to settlement
+                max_hold_hours=48,  # weather markets settle within 24-48h
             )
             await db_manager.add_position(position)
             
