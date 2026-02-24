@@ -513,8 +513,8 @@ async def run_weather_trading_cycle(
         logger.error(f"Could not fetch balance: {e}")
         return results
     
-    # Weather allocation: 50% of bankroll
-    weather_bankroll = bankroll * 0.50
+    # Use full available balance — no new deposits, trade only with what's in the account
+    weather_bankroll = bankroll
     
     if weather_bankroll < 5.0:
         logger.warning(f"⚠️ Insufficient weather bankroll: ${weather_bankroll:.2f}")
