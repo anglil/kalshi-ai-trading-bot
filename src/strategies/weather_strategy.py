@@ -222,11 +222,21 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
     title = market.get("title", "")
     ticker = market.get("ticker", "")
     
-    # Extract YES/NO prices
-    yes_price = market.get("yes_price", 50)
-    no_price = market.get("no_price", 50)
-    yes_ask = market.get("yes_ask", yes_price)
-    no_ask = market.get("no_ask", no_price)
+    # Extract YES/NO prices — skip bracket if no real price data
+    yes_price = market.get("yes_price") or market.get("yes_bid") or market.get("yes_ask")
+    no_price = market.get("no_price") or market.get("no_bid") or market.get("no_ask")
+
+    if yes_price is None and no_price is None:
+        return None  # No price data — cannot assess edge
+
+    # Fill in the missing side from the other
+    if yes_price is not None and no_price is None:
+        no_price = 100 - yes_price
+    elif no_price is not None and yes_price is None:
+        yes_price = 100 - no_price
+
+    yes_ask = market.get("yes_ask") or yes_price
+    no_ask = market.get("no_ask") or no_price
     volume = market.get("volume", 0)
     
     # Parse temperature range from title

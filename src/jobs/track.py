@@ -226,7 +226,8 @@ async def run_tracking(db_manager: Optional[DatabaseManager] = None):
                         pnl=pnl,
                         entry_timestamp=position.timestamp,
                         exit_timestamp=datetime.now(),
-                        rationale=f"{position.rationale} | EXIT: {exit_reason}"
+                        rationale=f"{position.rationale} | EXIT: {exit_reason}",
+                        strategy=getattr(position, 'strategy', None),
                     )
 
                     # Record the exit
