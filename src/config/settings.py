@@ -22,6 +22,7 @@ class APIConfig:
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     # OpenRouter now points at Google AI Studio's OpenAI-compatible endpoint
     openrouter_api_key: str = field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
+    eia_api_key: str = field(default_factory=lambda: os.getenv("EIA_API_KEY", ""))
     openai_base_url: str = "https://api.openai.com/v1"
     openrouter_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 

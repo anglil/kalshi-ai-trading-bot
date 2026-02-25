@@ -41,6 +41,9 @@ from src.config.settings import settings
 # Import Beast Mode components
 from src.strategies.unified_trading_system import run_unified_trading_system, TradingSystemConfig
 from src.strategies.weather_consensus import run_consensus_weather_cycle
+from src.strategies.gas_consensus import run_gas_consensus_cycle
+from src.strategies.econ_consensus import run_econ_consensus_cycle
+from src.strategies.flu_consensus import run_flu_consensus_cycle
 from beast_mode_dashboard import BeastModeDashboard
 
 
@@ -126,6 +129,9 @@ class BeastModeBot:
             tasks = [
                 ingestion_task,  # Already started
                 asyncio.create_task(self._run_weather_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_gas_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_econ_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_trading_cycles(db_manager, kalshi_client, xai_client)),
                 asyncio.create_task(self._run_position_tracking(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_performance_evaluation(db_manager))
@@ -342,6 +348,75 @@ class BeastModeBot:
                 await asyncio.sleep(1800)
             except Exception as e:
                 self.logger.error(f"Error in weather trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_gas_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for gas price consensus trading (runs every 6 hours)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(60)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                cycle += 1
+                self.logger.info(f"⛽ Starting Gas Price Trading Cycle #{cycle}")
+                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=False)
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"✅ Gas Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"📊 Gas Cycle #{cycle}: No trades this cycle")
+                # Run every 6 hours
+                await asyncio.sleep(21600)
+            except Exception as e:
+                self.logger.error(f"Error in gas trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_econ_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for economic data consensus trading (runs every 4 hours)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(90)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                cycle += 1
+                self.logger.info(f"📈 Starting Econ Data Trading Cycle #{cycle}")
+                results = await run_econ_consensus_cycle(kalshi_client, db_manager, paper_mode=False)
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"✅ Econ Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"📊 Econ Cycle #{cycle}: No trades this cycle")
+                # Run every 4 hours
+                await asyncio.sleep(14400)
+            except Exception as e:
+                self.logger.error(f"Error in econ trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_flu_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for flu/ILI consensus trading (runs every 12 hours)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(120)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                cycle += 1
+                self.logger.info(f"🤒 Starting Flu/ILI Trading Cycle #{cycle}")
+                results = await run_flu_consensus_cycle(kalshi_client, db_manager, paper_mode=False)
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"✅ Flu Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"📊 Flu Cycle #{cycle}: No trades this cycle")
+                # Run every 12 hours
+                await asyncio.sleep(43200)
+            except Exception as e:
+                self.logger.error(f"Error in flu trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
 
     async def run(self):
