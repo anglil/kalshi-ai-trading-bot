@@ -207,8 +207,11 @@ def load_system_health():
         asyncio.set_event_loop(loop)
 
         kalshi_client = KalshiClient()
+        db_manager = DatabaseManager()
 
         async def get_health():
+            await db_manager.initialize()
+
             # Get balance - includes portfolio_value from Kalshi
             balance_response = await kalshi_client.get_balance()
             available_cash = balance_response.get('balance', 0) / 100
@@ -233,6 +236,15 @@ def load_system_health():
             # Unrealized P&L = current position value - cost basis
             unrealized_pnl = position_value - total_cost_basis
 
+            # Record portfolio snapshot (rate-limited to 1 per 5 min inside the method)
+            await db_manager.record_portfolio_snapshot(
+                cash=available_cash,
+                position_value=position_value,
+                total=total_portfolio_value,
+                positions_count=len(active_positions),
+            )
+
+            await db_manager.close()
             await kalshi_client.close()
 
             return (available_cash, total_portfolio_value, len(active_positions),
@@ -267,6 +279,29 @@ def load_system_health():
             'unrealized_pnl': 0.0,
         }
 
+@st.cache_data(ttl=60)
+def load_portfolio_history():
+    """Load portfolio value history for the time-series chart."""
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        db_manager = DatabaseManager()
+
+        async def get_history():
+            await db_manager.initialize()
+            history = await db_manager.get_portfolio_history(hours_back=168)
+            await db_manager.close()
+            return history
+
+        history = loop.run_until_complete(get_history())
+        loop.close()
+        return history
+
+    except Exception as e:
+        st.error(f"Error loading portfolio history: {e}")
+        return []
+
 def main():
     """Main dashboard function."""
     
@@ -300,21 +335,22 @@ def main():
         performance_data, positions = load_performance_data()
         llm_queries, llm_stats = load_llm_data()
         system_health_data = load_system_health()
+        portfolio_history = load_portfolio_history()
     except Exception as e:
         st.error(f"Error loading dashboard data: {e}")
         st.info("Please check your system connections and try refreshing.")
         return
-    
+
     # Show data status in sidebar
     st.sidebar.markdown("---")
     st.sidebar.markdown("**📊 Data Status:**")
     st.sidebar.metric("Active Positions", len(positions) if positions else 0)
     st.sidebar.metric("LLM Queries (24h)", len(llm_queries) if llm_queries else 0)
     st.sidebar.metric("Portfolio Balance", f"${system_health_data.get('total_portfolio_value', 0):.2f}")
-    
+
     # Page routing
     if page == "📈 Overview":
-        show_overview(performance_data, positions, system_health_data)
+        show_overview(performance_data, positions, system_health_data, portfolio_history)
     elif page == "🎯 Strategy Performance":
         show_strategy_performance(performance_data)
     elif page == "🤖 LLM Analysis":
@@ -326,7 +362,7 @@ def main():
     elif page == "🔧 System Health":
         show_system_health(system_health_data['available_cash'], system_health_data['positions_count'], llm_stats)
 
-def show_overview(performance_data, positions, system_health_data):
+def show_overview(performance_data, positions, system_health_data, portfolio_history=None):
     """Show overview dashboard."""
 
     st.header("📈 System Overview")
@@ -397,7 +433,55 @@ def show_overview(performance_data, positions, system_health_data):
             value=f"${system_health_data['total_fees']:.2f}",
             help="Total trading fees paid on active positions"
         )
-    
+
+    # Portfolio value over time chart
+    if portfolio_history and len(portfolio_history) >= 2:
+        st.subheader("📈 Portfolio Value Over Time")
+
+        df_hist = pd.DataFrame(portfolio_history)
+        df_hist['timestamp'] = pd.to_datetime(df_hist['timestamp'])
+
+        # Determine line color: green if current > first, red otherwise
+        first_val = df_hist['total_portfolio_value'].iloc[0]
+        last_val = df_hist['total_portfolio_value'].iloc[-1]
+        line_color = "#28a745" if last_val >= first_val else "#dc3545"
+
+        fig_portfolio = go.Figure()
+
+        # Cash area (stacked underneath)
+        fig_portfolio.add_trace(go.Scatter(
+            x=df_hist['timestamp'],
+            y=df_hist['available_cash'],
+            fill='tozeroy',
+            fillcolor='rgba(40, 167, 69, 0.15)',
+            line=dict(color='rgba(40, 167, 69, 0.4)', width=1),
+            name='Available Cash',
+            hovertemplate='Cash: $%{y:.2f}<extra></extra>',
+        ))
+
+        # Total portfolio value line
+        fig_portfolio.add_trace(go.Scatter(
+            x=df_hist['timestamp'],
+            y=df_hist['total_portfolio_value'],
+            mode='lines+markers',
+            line=dict(color=line_color, width=2.5),
+            marker=dict(size=4),
+            name='Total Portfolio',
+            hovertemplate='Total: $%{y:.2f}<extra></extra>',
+        ))
+
+        fig_portfolio.update_layout(
+            xaxis_title="Time",
+            yaxis_title="Value ($)",
+            yaxis_tickprefix="$",
+            height=400,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=0, r=0, t=30, b=0),
+        )
+        st.plotly_chart(fig_portfolio, use_container_width=True)
+    elif portfolio_history and len(portfolio_history) == 1:
+        st.info("📈 Portfolio tracking started — chart will appear after a second data point (snapshots are taken every 5 minutes).")
+
     # Strategy performance summary
     if performance_data:
         st.subheader("🎯 Strategy Performance Summary")

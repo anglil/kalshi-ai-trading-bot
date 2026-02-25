@@ -188,7 +188,7 @@ class BeastModeBot:
     async def _run_trading_cycles(self, db_manager: DatabaseManager, kalshi_client: KalshiClient, xai_client: XAIClient):
         """Main Beast Mode trading cycles."""
         cycle_count = 0
-        
+
         while not self.shutdown_event.is_set():
             try:
                 # Check daily AI cost limits before starting cycle
@@ -196,13 +196,13 @@ class BeastModeBot:
                     # Sleep until next day if limits reached
                     await self._sleep_until_next_day()
                     continue
-                
+
                 cycle_count += 1
                 self.logger.info(f"🔄 Starting Beast Mode Trading Cycle #{cycle_count}")
-                
+
                 # Run the Beast Mode unified trading system
                 results = await run_trading_job()
-                
+
                 if results and results.total_positions > 0:
                     self.logger.info(
                         f"✅ Cycle #{cycle_count} Complete - "
@@ -212,13 +212,39 @@ class BeastModeBot:
                     )
                 else:
                     self.logger.info(f"📊 Cycle #{cycle_count} Complete - No new positions created")
-                
+
+                # Record portfolio snapshot after each cycle
+                await self._record_snapshot(db_manager, kalshi_client)
+
                 # Wait for next cycle (60 seconds)
                 await asyncio.sleep(60)
-                
+
             except Exception as e:
                 self.logger.error(f"Error in trading cycle #{cycle_count}: {e}")
                 await asyncio.sleep(60)
+
+    async def _record_snapshot(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Record a portfolio snapshot (rate-limited inside db method)."""
+        try:
+            balance_response = await kalshi_client.get_balance()
+            cash = balance_response.get('balance', 0) / 100
+            position_value = balance_response.get('portfolio_value', 0) / 100
+            total = cash + position_value
+
+            positions_response = await kalshi_client.get_positions()
+            active = [p for p in positions_response.get('market_positions', [])
+                      if p.get('position', 0) != 0]
+
+            recorded = await db_manager.record_portfolio_snapshot(
+                cash=cash,
+                position_value=position_value,
+                total=total,
+                positions_count=len(active),
+            )
+            if recorded:
+                self.logger.info(f"📸 Portfolio snapshot recorded: ${total:.2f}")
+        except Exception as e:
+            self.logger.error(f"Error recording portfolio snapshot: {e}")
 
     async def _check_daily_ai_limits(self, xai_client: XAIClient) -> bool:
         """

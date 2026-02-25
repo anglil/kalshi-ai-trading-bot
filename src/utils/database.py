@@ -319,6 +319,19 @@ class DatabaseManager(TradingLoggerMixin):
             )
         """)
 
+        # Portfolio snapshots for tracking portfolio value over time
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                available_cash REAL NOT NULL,
+                position_value REAL NOT NULL,
+                total_portfolio_value REAL NOT NULL,
+                positions_count INTEGER NOT NULL
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_ts ON portfolio_snapshots(timestamp)")
+
         # Create indices for performance
         await db.execute("CREATE INDEX IF NOT EXISTS idx_market_analyses_market_id ON market_analyses(market_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_market_analyses_timestamp ON market_analyses(analysis_timestamp)")
@@ -820,6 +833,64 @@ class DatabaseManager(TradingLoggerMixin):
         # since we use context managers, but we provide this method
         # for compatibility with other code that expects it
         pass
+
+    async def record_portfolio_snapshot(
+        self, cash: float, position_value: float, total: float, positions_count: int
+    ) -> bool:
+        """Record a portfolio value snapshot, rate-limited to 1 per 5 minutes.
+
+        Returns True if a snapshot was recorded, False if skipped due to rate limit.
+        """
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                # Rate-limit: skip if last snapshot was < 5 min ago
+                cutoff = (datetime.now() - timedelta(minutes=5)).isoformat()
+                cursor = await db.execute(
+                    "SELECT COUNT(*) FROM portfolio_snapshots WHERE timestamp > ?",
+                    (cutoff,)
+                )
+                count = (await cursor.fetchone())[0]
+                if count > 0:
+                    return False
+
+                await db.execute(
+                    """INSERT INTO portfolio_snapshots
+                       (timestamp, available_cash, position_value, total_portfolio_value, positions_count)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (datetime.now().isoformat(), cash, position_value, total, positions_count),
+                )
+                await db.commit()
+                return True
+        except Exception as e:
+            self.logger.error(f"Error recording portfolio snapshot: {e}")
+            return False
+
+    async def get_portfolio_history(self, hours_back: int = 168) -> List[dict]:
+        """Get portfolio snapshots within the given time range.
+
+        Args:
+            hours_back: Number of hours to look back (default 168 = 7 days).
+
+        Returns:
+            List of snapshot dicts ordered by timestamp ASC.
+        """
+        try:
+            cutoff = (datetime.now() - timedelta(hours=hours_back)).isoformat()
+            async with aiosqlite.connect(self.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    """SELECT timestamp, available_cash, position_value,
+                              total_portfolio_value, positions_count
+                       FROM portfolio_snapshots
+                       WHERE timestamp >= ?
+                       ORDER BY timestamp ASC""",
+                    (cutoff,),
+                )
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            self.logger.error(f"Error getting portfolio history: {e}")
+            return []
 
     async def record_market_analysis(
         self, 
