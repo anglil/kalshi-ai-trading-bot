@@ -2,16 +2,17 @@
 Multi-Source Gas Price Client
 
 Fetches national average gas price data from 3 free providers concurrently:
-  1. EIA (Energy Information Administration) — weekly national average
-  2. FRED (Federal Reserve Economic Data) — GASREGW series
-  3. AAA (American Automobile Association) — current national average
+  1. EIA (Energy Information Administration) — weekly national average (needs free API key)
+  2. AAA (American Automobile Association) — HTML scrape of national average
+  3. GasBuddy — HTML scrape of national average
 
-EIA requires a free API key (register at eia.gov). FRED and AAA are free.
+EIA requires a free API key (register at eia.gov). AAA and GasBuddy need no keys.
 """
 
 import asyncio
 import aiohttp
 import os
+import re
 import ssl
 import time
 from dataclasses import dataclass, field
@@ -54,7 +55,6 @@ async def _fetch_eia(session: aiohttp.ClientSession) -> Optional[ForecastSource]
     """
     Fetch weekly national average gas price from EIA API.
     Requires EIA_API_KEY environment variable.
-    Series: PET.EMM_EPMR_PTE_NUS_DPG.W (regular gasoline, national)
     """
     api_key = os.getenv("EIA_API_KEY", "")
     if not api_key:
@@ -102,64 +102,16 @@ async def _fetch_eia(session: aiohttp.ClientSession) -> Optional[ForecastSource]
         return None
 
 
-async def _fetch_fred_gas(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
-    """
-    Fetch gas price from FRED GASREGW series.
-    Uses the FRED API with the public DEMO key (rate-limited but free).
-    """
-    api_key = os.getenv("FRED_API_KEY", "DEMO")
-    url = (
-        f"https://api.stlouisfed.org/fred/series/observations"
-        f"?series_id=GASREGW"
-        f"&api_key={api_key}"
-        f"&file_type=json"
-        f"&sort_order=desc"
-        f"&limit=1"
-    )
-    try:
-        async with session.get(
-            url,
-            timeout=aiohttp.ClientTimeout(total=15),
-            ssl=_make_ssl_ctx(),
-        ) as resp:
-            if resp.status != 200:
-                logger.warning(f"FRED API returned {resp.status}")
-                return None
-            data = await resp.json()
-
-        observations = data.get("observations", [])
-        if not observations:
-            logger.warning("FRED GASREGW: no observations returned")
-            return None
-
-        value_str = observations[0].get("value", ".")
-        if value_str == ".":
-            return None
-
-        price = float(value_str)
-        if price <= 0:
-            return None
-
-        return ForecastSource(
-            provider="fred",
-            value=price,
-            model_name="FRED GASREGW",
-        )
-    except Exception as e:
-        logger.warning(f"FRED gas fetch failed: {e}")
-        return None
-
-
 async def _fetch_aaa_gas(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
     """
-    Fetch current national average gas price from AAA.
-    Scrapes the AAA gas prices API endpoint.
+    Fetch current national average gas price from AAA by scraping HTML.
+    The first dollar amount on the page is the national regular average.
     """
-    url = "https://gasprices.aaa.com/wp-json/fuel/v1/prices"
+    url = "https://gasprices.aaa.com/"
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; GasPriceBot/1.0)",
-            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept": "text/html",
         }
         async with session.get(
             url,
@@ -170,31 +122,16 @@ async def _fetch_aaa_gas(session: aiohttp.ClientSession) -> Optional[ForecastSou
             if resp.status != 200:
                 logger.warning(f"AAA gas prices returned {resp.status}")
                 return None
-            data = await resp.json()
+            html = await resp.text()
 
-        # AAA returns structure with national averages
-        # Try common response shapes
-        regular = None
-        if isinstance(data, dict):
-            # Try direct access
-            regular = data.get("regular")
-            if regular is None:
-                # Try nested under "national"
-                national = data.get("national", {})
-                if isinstance(national, dict):
-                    regular = national.get("regular") or national.get("gas_regular")
-                # Try under "today"
-                if regular is None:
-                    today = data.get("today", {})
-                    if isinstance(today, dict):
-                        regular = today.get("regular")
-
-        if regular is None:
-            logger.warning("AAA: could not extract regular gas price from response")
+        # Extract dollar amounts from page — first match is national regular average
+        prices = re.findall(r'\$(\d+\.\d{2,3})', html)
+        if not prices:
+            logger.warning("AAA: no gas prices found in HTML")
             return None
 
-        price = float(regular)
-        if price <= 0:
+        price = float(prices[0])
+        if price <= 0 or price > 10:
             return None
 
         return ForecastSource(
@@ -204,6 +141,47 @@ async def _fetch_aaa_gas(session: aiohttp.ClientSession) -> Optional[ForecastSou
         )
     except Exception as e:
         logger.warning(f"AAA gas fetch failed: {e}")
+        return None
+
+
+async def _fetch_gasbuddy(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
+    """
+    Fetch current national average gas price from GasBuddy by scraping HTML.
+    """
+    url = "https://www.gasbuddy.com/charts"
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept": "text/html",
+        }
+        async with session.get(
+            url,
+            timeout=aiohttp.ClientTimeout(total=15),
+            headers=headers,
+            ssl=_make_ssl_ctx(),
+        ) as resp:
+            if resp.status != 200:
+                logger.warning(f"GasBuddy returned {resp.status}")
+                return None
+            html = await resp.text()
+
+        # Look for national average price pattern
+        prices = re.findall(r'\$(\d+\.\d{2,3})', html)
+        if not prices:
+            logger.warning("GasBuddy: no gas prices found in HTML")
+            return None
+
+        price = float(prices[0])
+        if price <= 0 or price > 10:
+            return None
+
+        return ForecastSource(
+            provider="gasbuddy",
+            value=price,
+            model_name="GasBuddy National Average",
+        )
+    except Exception as e:
+        logger.warning(f"GasBuddy gas fetch failed: {e}")
         return None
 
 
@@ -222,12 +200,12 @@ async def fetch_gas_forecasts() -> MultiSourceForecast:
 
     async with aiohttp.ClientSession() as session:
         eia_task = _fetch_eia(session)
-        fred_task = _fetch_fred_gas(session)
         aaa_task = _fetch_aaa_gas(session)
+        gasbuddy_task = _fetch_gasbuddy(session)
 
-        outcomes = await asyncio.gather(eia_task, fred_task, aaa_task, return_exceptions=True)
+        outcomes = await asyncio.gather(eia_task, aaa_task, gasbuddy_task, return_exceptions=True)
 
-    provider_names = ["eia", "fred", "aaa"]
+    provider_names = ["eia", "aaa", "gasbuddy"]
     for name, outcome in zip(provider_names, outcomes):
         if isinstance(outcome, Exception):
             logger.warning(f"Provider {name} raised exception: {outcome}")

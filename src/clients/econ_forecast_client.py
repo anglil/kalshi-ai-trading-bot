@@ -310,7 +310,7 @@ async def fetch_econ_forecasts(indicator: str) -> MultiSourceForecast:
     _cache[cache_key] = (time.time(), result)
 
     providers_ok = [s.provider for s in result.sources]
-    values = [f"{s.value:.2f}{ECON_INDICATORS.get(indicator, EconIndicator('','',[],'',0,0,0,0)).unit}" for s in result.sources]
+    values = [f"{s.value:.2f}{ECON_INDICATORS.get(indicator, EconIndicator('','',[],'',0,0,0)).unit}" for s in result.sources]
     logger.info(
         f"Econ forecasts ({indicator}): {len(result.sources)}/{len(provider_names)} sources — "
         f"{dict(zip(providers_ok, values))}, "
