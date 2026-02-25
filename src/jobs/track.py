@@ -18,21 +18,21 @@ from src.utils.logging_setup import setup_logging, get_trading_logger
 from src.clients.kalshi_client import KalshiClient
 
 async def should_exit_position(
-    position: Position, 
-    current_yes_price: float, 
-    current_no_price: float, 
+    position: Position,
+    current_yes_price: float,
+    current_no_price: float,
     market_status: str,
     market_result: str = None
 ) -> tuple[bool, str, float]:
     """
     Determine if position should be exited based on smart exit strategies.
-    
+
     Returns:
         (should_exit, exit_reason, exit_price)
     """
     current_price = current_yes_price if position.side == "YES" else current_no_price
-    
-    # 1. Market resolution (original logic)
+
+    # 1. Market resolution (original logic) — always applies
     if market_status == 'closed':
         # If market resolved, use the result to determine exit price
         if market_result:
@@ -41,18 +41,27 @@ async def should_exit_position(
             # Fallback to current price if no result available
             exit_price = current_price
         return True, "market_resolution", exit_price
-    
+
+    # Guard: skip all price-based exits when current_price is 0 (no market data)
+    if current_price <= 0:
+        return False, "", current_price
+
+    # Guard: weather positions hold to settlement — no stop-loss or take-profit
+    strategy = getattr(position, 'strategy', '') or ''
+    if strategy.startswith('weather'):
+        return False, "", current_price
+
     # 2. ENHANCED Stop-loss exit using proper logic for YES/NO positions
     if position.stop_loss_price:
         from src.utils.stop_loss_calculator import StopLossCalculator
-        
+
         should_trigger = StopLossCalculator.is_stop_loss_triggered(
             position_side=position.side,
             entry_price=position.entry_price,
             current_price=current_price,
             stop_loss_price=position.stop_loss_price
         )
-        
+
         if should_trigger:
             # Calculate the actual loss to log it
             expected_pnl = StopLossCalculator.calculate_pnl_at_stop_loss(
@@ -62,27 +71,27 @@ async def should_exit_position(
                 side=position.side
             )
             return True, f"stop_loss_triggered_pnl_{expected_pnl:.2f}", current_price
-    
+
     # 3. Take-profit exit (enhanced logic for YES/NO)
     if position.take_profit_price:
         take_profit_triggered = False
-        
+
         if position.side == "YES":
             # For YES positions, take profit when price rises above target
             take_profit_triggered = current_price >= position.take_profit_price
         else:
             # For NO positions, take profit when price falls below target
             take_profit_triggered = current_price <= position.take_profit_price
-            
+
         if take_profit_triggered:
             return True, "take_profit", current_price
-    
+
     # 4. Time-based exit
     if position.max_hold_hours:
         hours_held = (datetime.now() - position.timestamp).total_seconds() / 3600
         if hours_held >= position.max_hold_hours:
             return True, "time_based", current_price
-    
+
     # 5. Emergency exit for positions without stop-loss (legacy positions)
     if not position.stop_loss_price:
         # Calculate emergency stop-loss at 10% loss
@@ -92,21 +101,21 @@ async def should_exit_position(
             side=position.side,
             stop_loss_pct=0.10  # 10% emergency stop
         )
-        
+
         emergency_triggered = StopLossCalculator.is_stop_loss_triggered(
             position_side=position.side,
             entry_price=position.entry_price,
             current_price=current_price,
             stop_loss_price=emergency_stop
         )
-        
+
         if emergency_triggered:
             return True, "emergency_stop_loss_10pct", current_price
-    
+
     # 6. Confidence-based exit (placeholder - would need re-analysis)
     # This would require periodic re-analysis, which we're avoiding for cost reasons
     # Could be implemented as a separate, less frequent job
-    
+
     return False, "", current_price
 
 async def calculate_dynamic_exit_levels(position: Position) -> dict:
