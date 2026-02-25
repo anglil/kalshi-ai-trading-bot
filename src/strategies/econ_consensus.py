@@ -63,16 +63,28 @@ def compute_econ_consensus(
     values = [s.value for s in forecast.sources]
     n = len(values)
 
-    if n < 2:
-        fallback = values[0] if values else 0.0
+    if n == 0:
         return EconConsensusResult(
-            consensus_value=fallback,
+            consensus_value=0.0,
             sigma=indicator.sigma_low,
             confidence="skip",
             agreement_ratio=0.0,
+            cluster_values=[],
+            all_values=[],
+            source_count=0,
+            indicator=indicator.name,
+        )
+
+    if n == 1:
+        # Single source: treat as medium confidence with wider sigma
+        return EconConsensusResult(
+            consensus_value=values[0],
+            sigma=indicator.sigma_med,
+            confidence="medium",
+            agreement_ratio=1.0,
             cluster_values=values,
             all_values=values,
-            source_count=n,
+            source_count=1,
             indicator=indicator.name,
         )
 

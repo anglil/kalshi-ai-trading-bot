@@ -282,7 +282,13 @@ async def _fetch_cdc_ilinet(session: aiohttp.ClientSession) -> Optional[Forecast
         # Find weighted ILI in last row
         latest = rows[-1]
         weighted_ili = None
-        for key in ["%WEIGHTED ILI", "WEIGHTED ILI", "%_WEIGHTED_ILI", "% WEIGHTED ILI"]:
+        for key in [
+            "%WEIGHTED ILI",
+            "WEIGHTED ILI",
+            "%_WEIGHTED_ILI",
+            "% WEIGHTED ILI",
+            "PERCENTAGE OF VISITS FOR INFLUENZA-LIKE-ILLNESS REPORTED BY SENTINEL PROVIDERS",
+        ]:
             if key in latest:
                 try:
                     weighted_ili = float(latest[key])

@@ -87,17 +87,29 @@ def compute_flu_consensus(forecast: MultiSourceForecast) -> FluConsensusResult:
     values = [s.value for s in forecast.sources]
     n = len(values)
 
-    if n < 2:
-        fallback = values[0] if values else 2.5
+    if n == 0:
         return FluConsensusResult(
-            consensus_ili=fallback,
-            consensus_level=ili_to_level(fallback),
+            consensus_ili=2.5,
+            consensus_level=ili_to_level(2.5),
             sigma=FLU_CONSENSUS_PARAMS["sigma_low"],
             confidence="skip",
             agreement_ratio=0.0,
+            cluster_values=[],
+            all_values=[],
+            source_count=0,
+        )
+
+    if n == 1:
+        # Single source: treat as medium confidence with wider sigma
+        return FluConsensusResult(
+            consensus_ili=values[0],
+            consensus_level=ili_to_level(values[0]),
+            sigma=FLU_CONSENSUS_PARAMS["sigma_med"],
+            confidence="medium",
+            agreement_ratio=1.0,
             cluster_values=values,
             all_values=values,
-            source_count=n,
+            source_count=1,
         )
 
     sorted_values = sorted(values)

@@ -269,24 +269,17 @@ async def fetch_econ_forecasts(indicator: str) -> MultiSourceForecast:
             provider_names.append("atlanta_fed")
             tasks.append(_fetch_ny_fed_nowcast(session, indicator="GDP"))
             provider_names.append("ny_fed")
-            # Cleveland Fed also publishes GDP-related data
-            tasks.append(_fetch_cleveland_fed_cpi(session))
-            provider_names.append("cleveland_fed")
         elif indicator == "CPI":
             tasks.append(_fetch_cleveland_fed_cpi(session))
             provider_names.append("cleveland_fed")
             tasks.append(_fetch_ny_fed_nowcast(session, indicator="CPI"))
             provider_names.append("ny_fed")
-            tasks.append(_fetch_atlanta_fed_gdpnow(session))
-            provider_names.append("atlanta_fed")
         elif indicator == "NFP":
-            # NFP is harder to nowcast — use GDP models as proxy signals
-            tasks.append(_fetch_atlanta_fed_gdpnow(session))
-            provider_names.append("atlanta_fed")
+            # NFP is hard to nowcast — use available macro sources
             tasks.append(_fetch_ny_fed_nowcast(session, indicator="NFP"))
             provider_names.append("ny_fed")
-            tasks.append(_fetch_cleveland_fed_cpi(session))
-            provider_names.append("cleveland_fed")
+            tasks.append(_fetch_atlanta_fed_gdpnow(session))
+            provider_names.append("atlanta_fed")
         else:
             logger.warning(f"Unknown indicator: {indicator}")
             return result
@@ -300,12 +293,7 @@ async def fetch_econ_forecasts(indicator: str) -> MultiSourceForecast:
         elif outcome is None:
             result.failed_sources.append(name)
         else:
-            # Only include sources that match the requested indicator
-            if outcome.indicator == indicator:
-                result.sources.append(outcome)
-            else:
-                # Cross-indicator source — still useful for consensus
-                result.sources.append(outcome)
+            result.sources.append(outcome)
 
     _cache[cache_key] = (time.time(), result)
 

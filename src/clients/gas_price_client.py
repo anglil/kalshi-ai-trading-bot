@@ -144,11 +144,12 @@ async def _fetch_aaa_gas(session: aiohttp.ClientSession) -> Optional[ForecastSou
         return None
 
 
-async def _fetch_gasbuddy(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
+async def _fetch_eia_public(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
     """
-    Fetch current national average gas price from GasBuddy by scraping HTML.
+    Fetch national average gas price from EIA public web page (no API key needed).
+    Scrapes the Gas Diesel page which shows current national regular average.
     """
-    url = "https://www.gasbuddy.com/charts"
+    url = "https://www.eia.gov/petroleum/gasdiesel/"
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -161,14 +162,14 @@ async def _fetch_gasbuddy(session: aiohttp.ClientSession) -> Optional[ForecastSo
             ssl=_make_ssl_ctx(),
         ) as resp:
             if resp.status != 200:
-                logger.warning(f"GasBuddy returned {resp.status}")
+                logger.warning(f"EIA public page returned {resp.status}")
                 return None
             html = await resp.text()
 
-        # Look for national average price pattern
+        # First dollar amount on the page is the national regular average
         prices = re.findall(r'\$(\d+\.\d{2,3})', html)
         if not prices:
-            logger.warning("GasBuddy: no gas prices found in HTML")
+            logger.warning("EIA public: no gas prices found in HTML")
             return None
 
         price = float(prices[0])
@@ -176,12 +177,12 @@ async def _fetch_gasbuddy(session: aiohttp.ClientSession) -> Optional[ForecastSo
             return None
 
         return ForecastSource(
-            provider="gasbuddy",
+            provider="eia_public",
             value=price,
-            model_name="GasBuddy National Average",
+            model_name="EIA Public Gas Price",
         )
     except Exception as e:
-        logger.warning(f"GasBuddy gas fetch failed: {e}")
+        logger.warning(f"EIA public fetch failed: {e}")
         return None
 
 
@@ -201,11 +202,11 @@ async def fetch_gas_forecasts() -> MultiSourceForecast:
     async with aiohttp.ClientSession() as session:
         eia_task = _fetch_eia(session)
         aaa_task = _fetch_aaa_gas(session)
-        gasbuddy_task = _fetch_gasbuddy(session)
+        eia_pub_task = _fetch_eia_public(session)
 
-        outcomes = await asyncio.gather(eia_task, aaa_task, gasbuddy_task, return_exceptions=True)
+        outcomes = await asyncio.gather(eia_task, aaa_task, eia_pub_task, return_exceptions=True)
 
-    provider_names = ["eia", "aaa", "gasbuddy"]
+    provider_names = ["eia", "aaa", "eia_public"]
     for name, outcome in zip(provider_names, outcomes):
         if isinstance(outcome, Exception):
             logger.warning(f"Provider {name} raised exception: {outcome}")

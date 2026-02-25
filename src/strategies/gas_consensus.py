@@ -76,16 +76,27 @@ def compute_gas_consensus(forecast: MultiSourceForecast) -> GasConsensusResult:
     prices = [s.value for s in forecast.sources]
     n = len(prices)
 
-    if n < 2:
-        fallback_price = prices[0] if prices else 0.0
+    if n == 0:
         return GasConsensusResult(
-            consensus_price=fallback_price,
+            consensus_price=0.0,
             sigma=GAS_CONSENSUS_PARAMS["sigma_low"],
             confidence="skip",
             agreement_ratio=0.0,
+            cluster_prices=[],
+            all_prices=[],
+            source_count=0,
+        )
+
+    if n == 1:
+        # Single source: treat as medium confidence with wider sigma
+        return GasConsensusResult(
+            consensus_price=prices[0],
+            sigma=GAS_CONSENSUS_PARAMS["sigma_med"],
+            confidence="medium",
+            agreement_ratio=1.0,
             cluster_prices=prices,
             all_prices=prices,
-            source_count=n,
+            source_count=1,
         )
 
     sorted_prices = sorted(prices)
