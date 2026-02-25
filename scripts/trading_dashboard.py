@@ -465,15 +465,26 @@ def show_overview(performance_data, positions, system_health_data, portfolio_his
             y=df_hist['total_portfolio_value'],
             mode='lines+markers',
             line=dict(color=line_color, width=2.5),
-            marker=dict(size=4),
+            marker=dict(size=5),
             name='Total Portfolio',
             hovertemplate='Total: $%{y:.2f}<extra></extra>',
         ))
 
+        # Deposit baseline
+        fig_portfolio.add_hline(
+            y=400, line_dash="dash", line_color="gray", line_width=1,
+            annotation_text="Deposited ($400)",
+            annotation_position="bottom right",
+            annotation_font_color="gray",
+        )
+
+        # Y-axis range: show from 0 to give context, with some headroom
+        y_max = df_hist['total_portfolio_value'].max() * 1.1
         fig_portfolio.update_layout(
             xaxis_title="Time",
             yaxis_title="Value ($)",
             yaxis_tickprefix="$",
+            yaxis_range=[0, y_max],
             height=400,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=0, r=0, t=30, b=0),
