@@ -316,6 +316,20 @@ async def run_consensus_weather_cycle(
     all_signals.sort(key=lambda s: s.edge, reverse=True)
     max_trades = 5
 
+    # Filter out signals for tickers where we already hold a position
+    held_tickers = set()
+    try:
+        open_positions = await db_manager.get_open_live_positions()
+        held_tickers = {p.market_id for p in open_positions}
+        if held_tickers:
+            before = len(all_signals)
+            all_signals = [s for s in all_signals if s.bracket.ticker not in held_tickers]
+            skipped = before - len(all_signals)
+            if skipped > 0:
+                logger.info(f"CONSENSUS: Filtered out {skipped} signals for already-held positions")
+    except Exception as e:
+        logger.warning(f"Could not check existing positions: {e}")
+
     logger.info(f"CONSENSUS: Top signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):
         logger.info(f"  #{i+1}: {sig.rationale}")

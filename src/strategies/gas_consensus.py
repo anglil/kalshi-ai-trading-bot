@@ -37,7 +37,7 @@ logger = get_trading_logger("gas_consensus")
 # ============================================================
 
 GAS_CONSENSUS_PARAMS = {
-    "cluster_tolerance": 0.05,   # $0.05 — sources within this range agree
+    "cluster_tolerance": 0.10,   # $0.10 — sources within this range agree
     "sigma_high": 0.03,         # $ — tight sigma when high agreement
     "sigma_med": 0.06,          # $ — medium sigma
     "sigma_low": 0.12,          # $ — wide sigma when low agreement

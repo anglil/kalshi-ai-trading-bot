@@ -46,9 +46,14 @@ async def should_exit_position(
     if current_price <= 0:
         return False, "", current_price
 
-    # Guard: weather positions hold to settlement — no stop-loss or take-profit
+    # Guard: weather/consensus positions hold to settlement — no stop-loss or take-profit
     strategy = getattr(position, 'strategy', '') or ''
-    if strategy.startswith('weather'):
+    if strategy.startswith('weather') or strategy.endswith('_consensus'):
+        return False, "", current_price
+
+    # Guard: don't exit positions less than 5 minutes old (prevent race conditions)
+    age_seconds = (datetime.now() - position.timestamp).total_seconds()
+    if age_seconds < 300:
         return False, "", current_price
 
     # 2. ENHANCED Stop-loss exit using proper logic for YES/NO positions
@@ -72,16 +77,11 @@ async def should_exit_position(
             )
             return True, f"stop_loss_triggered_pnl_{expected_pnl:.2f}", current_price
 
-    # 3. Take-profit exit (enhanced logic for YES/NO)
+    # 3. Take-profit exit — for both sides, trigger when position value rises
     if position.take_profit_price:
-        take_profit_triggered = False
-
-        if position.side == "YES":
-            # For YES positions, take profit when price rises above target
-            take_profit_triggered = current_price >= position.take_profit_price
-        else:
-            # For NO positions, take profit when price falls below target
-            take_profit_triggered = current_price <= position.take_profit_price
+        # For both YES and NO: take profit when current price rises above target
+        # (higher price = position is more valuable for both sides)
+        take_profit_triggered = current_price >= position.take_profit_price
 
         if take_profit_triggered:
             return True, "take_profit", current_price

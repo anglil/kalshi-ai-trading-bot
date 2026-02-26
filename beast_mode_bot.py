@@ -359,7 +359,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"⛽ Starting Gas Price Trading Cycle #{cycle}")
-                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=False)
+                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(
@@ -382,7 +382,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"📈 Starting Econ Data Trading Cycle #{cycle}")
-                results = await run_econ_consensus_cycle(kalshi_client, db_manager, paper_mode=False)
+                results = await run_econ_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(
@@ -405,7 +405,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"🤒 Starting Flu/ILI Trading Cycle #{cycle}")
-                results = await run_flu_consensus_cycle(kalshi_client, db_manager, paper_mode=False)
+                results = await run_flu_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(

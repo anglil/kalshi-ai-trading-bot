@@ -29,6 +29,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.database import DatabaseManager
 from src.clients.kalshi_client import KalshiClient
 
+# Starting capital — used for true P&L calculation
+STARTING_CAPITAL = 400.0
+
 # Configure Streamlit page
 st.set_page_config(
     page_title="Trading System Dashboard",
@@ -233,7 +236,9 @@ def load_system_health():
             total_fees = sum(p.get('fees_paid', 0) for p in active_positions) / 100
             total_realized_pnl = sum(p.get('realized_pnl', 0) for p in market_positions) / 100
 
-            # Unrealized P&L = current position value - cost basis
+            # True total P&L = current portfolio value - starting capital
+            total_pnl = total_portfolio_value - STARTING_CAPITAL
+            # Unrealized P&L on open positions = mark-to-market - cost basis
             unrealized_pnl = position_value - total_cost_basis
 
             # Record portfolio snapshot (rate-limited to 1 per 5 min inside the method)
@@ -249,10 +254,10 @@ def load_system_health():
 
             return (available_cash, total_portfolio_value, len(active_positions),
                     position_value, total_cost_basis, total_fees,
-                    total_realized_pnl, unrealized_pnl)
+                    total_realized_pnl, unrealized_pnl, total_pnl)
 
         (available_cash, total_portfolio_value, positions_count, position_value,
-         total_cost_basis, total_fees, realized_pnl, unrealized_pnl) = loop.run_until_complete(get_health())
+         total_cost_basis, total_fees, realized_pnl, unrealized_pnl, total_pnl) = loop.run_until_complete(get_health())
         loop.close()
 
         return {
@@ -264,6 +269,7 @@ def load_system_health():
             'total_fees': total_fees,
             'realized_pnl': realized_pnl,
             'unrealized_pnl': unrealized_pnl,
+            'total_pnl': total_pnl,
         }
 
     except Exception as e:
@@ -277,6 +283,7 @@ def load_system_health():
             'total_fees': 0.0,
             'realized_pnl': 0.0,
             'unrealized_pnl': 0.0,
+            'total_pnl': 0.0,
         }
 
 @st.cache_data(ttl=60)
@@ -386,14 +393,13 @@ def show_overview(performance_data, positions, system_health_data, portfolio_his
         )
 
     with col3:
-        realized = system_health_data.get('realized_pnl', 0)
+        total_pnl = system_health_data.get('total_pnl', 0)
         unrealized = system_health_data.get('unrealized_pnl', 0)
-        total_pnl = realized + unrealized
         st.metric(
             label="💹 Total P&L",
             value=f"${total_pnl:+.2f}",
             delta=f"Unrealized: ${unrealized:+.2f}",
-            help="Realized + unrealized P&L"
+            help=f"Portfolio value vs ${STARTING_CAPITAL:.0f} starting capital"
         )
 
     with col4:
@@ -472,8 +478,8 @@ def show_overview(performance_data, positions, system_health_data, portfolio_his
 
         # Deposit baseline
         fig_portfolio.add_hline(
-            y=400, line_dash="dash", line_color="gray", line_width=1,
-            annotation_text="Deposited ($400)",
+            y=STARTING_CAPITAL, line_dash="dash", line_color="gray", line_width=1,
+            annotation_text=f"Deposited (${STARTING_CAPITAL:.0f})",
             annotation_position="bottom right",
             annotation_font_color="gray",
         )

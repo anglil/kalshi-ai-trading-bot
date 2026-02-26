@@ -370,6 +370,7 @@ def generate_weather_signals(
             continue
         
         shares = max(1, int(position_size / entry_price_dollars))
+        shares = min(shares, 10)  # cap to prevent penny bet accumulation
         actual_position = shares * entry_price_dollars
         
         # Set limit price: our fair value minus some margin for fill
@@ -431,9 +432,20 @@ async def execute_weather_trade(
     Returns True if order was placed successfully.
     """
     try:
+        # Check for existing position BEFORE placing order to prevent stacking
+        existing = await db_manager.get_position_by_market_and_side(
+            signal.bracket.ticker, signal.side,
+        )
+        if existing:
+            logger.info(
+                f"⏭️ SKIP: Already hold {signal.bracket.ticker} {signal.side} — "
+                f"no duplicate order placed"
+            )
+            return False
+
         client_order_id = str(uuid.uuid4())
         side_lower = signal.side.lower()
-        
+
         order_kwargs = {
             "ticker": signal.bracket.ticker,
             "client_order_id": client_order_id,
@@ -442,19 +454,19 @@ async def execute_weather_trade(
             "count": signal.shares,
             "type_": "limit",
         }
-        
+
         # Set limit price
         if side_lower == "yes":
             order_kwargs["yes_price"] = signal.limit_price
         else:
             order_kwargs["no_price"] = signal.limit_price
-        
+
         logger.info(
             f"🌡️ WEATHER TRADE: {signal.city} {signal.bracket.ticker} — "
             f"{signal.shares} {signal.side} @ {signal.limit_price}¢ "
             f"(edge: {signal.edge:.0%})"
         )
-        
+
         order_response = await kalshi_client.place_order(**order_kwargs)
         
         if order_response and "order" in order_response:
@@ -472,8 +484,8 @@ async def execute_weather_trade(
                 timestamp=datetime.now(),
                 rationale=signal.rationale,
                 strategy=strategy,
-                stop_loss_price=0.01 if signal.side == "YES" else 0.99,  # effectively disabled
-                take_profit_price=0.99 if signal.side == "YES" else 0.01,  # let it ride to settlement
+                stop_loss_price=0.01,   # effectively disabled — hold to settlement
+                take_profit_price=0.99, # effectively disabled — hold to settlement
                 max_hold_hours=48,  # weather markets settle within 24-48h
             )
             await db_manager.add_position(position)
