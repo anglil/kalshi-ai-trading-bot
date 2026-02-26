@@ -47,6 +47,7 @@ class PositionToClose:
     confidence: float
     age_hours: float
     priority_score: float  # Higher = more urgent to close
+    quantity: int = 1
 
 
 class PositionLimitsManager:
@@ -185,10 +186,12 @@ class PositionLimitsManager:
             closed_positions = []
             for candidate in closure_candidates:
                 try:
-                    # Close the position
-                    await self._close_position(candidate)
-                    closed_positions.append(candidate.market_id)
-                    self.logger.info(f"✅ CLOSED POSITION: {candidate.market_id} (Priority: {candidate.priority_score:.2f})")
+                    success = await self._close_position(candidate)
+                    if success:
+                        closed_positions.append(candidate.market_id)
+                        self.logger.info(f"✅ CLOSED POSITION: {candidate.market_id} (Priority: {candidate.priority_score:.2f})")
+                    else:
+                        self.logger.warning(f"⏳ Position {candidate.market_id} sell failed — will retry next cycle")
                 except Exception as e:
                     self.logger.error(f"Failed to close position {candidate.market_id}: {e}")
             
@@ -308,7 +311,8 @@ class PositionLimitsManager:
                     current_pnl=0.0,  # Could be calculated with real-time pricing
                     confidence=position.confidence or 0.5,
                     age_hours=age_hours,
-                    priority_score=priority_score
+                    priority_score=priority_score,
+                    quantity=position.quantity,
                 )
                 closure_candidates.append(candidate)
             
@@ -359,16 +363,24 @@ class PositionLimitsManager:
         try:
             import uuid
 
-            # Actually sell the position on Kalshi exchange
+            # Build sell order — sell at 1 cent (worst price) to ensure fill like a market order
+            side_lower = candidate.side.lower()
+            order_kwargs = {
+                "ticker": candidate.market_id,
+                "client_order_id": str(uuid.uuid4()),
+                "side": side_lower,
+                "action": "sell",
+                "count": candidate.quantity,
+                "type_": "limit",
+            }
+            # Set price to 1 cent on our side (worst case = guaranteed fill)
+            if side_lower == "yes":
+                order_kwargs["yes_price"] = 1
+            else:
+                order_kwargs["no_price"] = 1
+
             try:
-                order_response = await self.kalshi_client.place_order(
-                    ticker=candidate.market_id,
-                    client_order_id=str(uuid.uuid4()),
-                    side=candidate.side.lower(),
-                    action="sell",
-                    count=1,  # Sell all contracts — Kalshi will cap at actual holding
-                    type_="market",
-                )
+                order_response = await self.kalshi_client.place_order(**order_kwargs)
                 self.logger.info(
                     f"Position {candidate.market_id} sold on Kalshi: {order_response}"
                 )
