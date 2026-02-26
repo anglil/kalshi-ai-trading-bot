@@ -1177,8 +1177,9 @@ async def _evaluate_immediate_trade(
             # Set the position ID so execute_position can update the database
             position.id = position_id
             
-            # Execute the trade (live_mode=True for immediate trades)
-            success = await execute_position(position, True, db_manager, kalshi_client)
+            # Execute the trade — respect paper mode setting
+            live_mode = getattr(settings.trading, 'live_trading_enabled', False)
+            success = await execute_position(position, live_mode, db_manager, kalshi_client)
             if success:
                 logger.info(f"✅ IMMEDIATE TRADE EXECUTED: {opportunity.market_id} - ${position_size:.0f} position")
             else:

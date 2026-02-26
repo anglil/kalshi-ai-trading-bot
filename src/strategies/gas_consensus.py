@@ -161,7 +161,7 @@ async def _discover_gas_markets(kalshi_client: KalshiClient) -> List[Temperature
             markets_response = await kalshi_client.get_markets(
                 limit=100,
                 series_ticker=series,
-                status="active",
+                status="open",
             )
             markets = markets_response.get("markets", [])
             if not markets:
@@ -179,7 +179,7 @@ async def _discover_gas_markets(kalshi_client: KalshiClient) -> List[Temperature
                 )
 
             for market in markets:
-                if market.get("status") != "active":
+                if market.get("status") not in ("active", "open"):
                     continue
                 bracket = _parse_gas_bracket(market)
                 if bracket:
@@ -384,10 +384,9 @@ async def run_gas_consensus_cycle(
         bankroll = 1000.0
     else:
         try:
-            balance_response = await kalshi_client.get_balance()
-            bankroll = balance_response.get("balance", 0) / 100.0
+            bankroll = await kalshi_client.get_total_portfolio_value()
         except Exception as e:
-            logger.error(f"Could not fetch balance: {e}")
+            logger.error(f"Could not fetch portfolio value: {e}")
             return results
 
         if bankroll < 5.0:

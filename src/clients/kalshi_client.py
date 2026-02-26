@@ -254,20 +254,21 @@ class KalshiClient(TradingLoggerMixin):
     ) -> Dict[str, Any]:
         """
         Get markets data.
-        
+
         Args:
             limit: Maximum number of markets to return
             cursor: Pagination cursor
             event_ticker: Filter by event ticker
             series_ticker: Filter by series ticker
-            status: Filter by market status
+            status: Filter by market status (valid: "open", "closed", "settled")
             tickers: List of specific tickers to fetch
-        
+
         Returns:
             Markets data
         """
+        VALID_STATUSES = {"open", "closed", "settled"}
         params = {"limit": limit}
-        
+
         if cursor:
             params["cursor"] = cursor
         if event_ticker:
@@ -275,6 +276,12 @@ class KalshiClient(TradingLoggerMixin):
         if series_ticker:
             params["series_ticker"] = series_ticker
         if status:
+            if status not in VALID_STATUSES:
+                self.logger.warning(
+                    f"Invalid market status filter '{status}', using 'open' instead. "
+                    f"Valid values: {VALID_STATUSES}"
+                )
+                status = "open"
             params["status"] = status
         if tickers:
             params["tickers"] = ",".join(tickers)
@@ -388,6 +395,33 @@ class KalshiClient(TradingLoggerMixin):
         return await self._make_authenticated_request(
             "DELETE", f"/trade-api/v2/portfolio/orders/{order_id}"
         )
+
+    async def get_total_portfolio_value(self) -> float:
+        """
+        Get total portfolio value (cash + position market values) in dollars.
+        This provides the true bankroll for position sizing.
+        """
+        try:
+            balance_response = await self.get_balance()
+            cash = balance_response.get("balance", 0) / 100.0
+
+            positions_response = await self.get_positions()
+            position_value = 0.0
+            for pos in positions_response.get("market_positions", []):
+                qty = abs(pos.get("position", 0))
+                if qty == 0:
+                    continue
+                market_price = pos.get("market_price", 50)  # cents
+                position_value += qty * market_price / 100.0
+
+            return cash + position_value
+        except Exception:
+            # Fallback to cash-only if positions API fails
+            try:
+                balance_response = await self.get_balance()
+                return balance_response.get("balance", 0) / 100.0
+            except Exception:
+                return 0.0
     
     async def get_trades(
         self,

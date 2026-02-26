@@ -13,6 +13,7 @@ import asyncio
 import aiohttp
 import csv
 import io
+import os
 import ssl
 import time
 import zipfile
@@ -106,12 +107,19 @@ async def _fetch_delphi_covidcast(session: aiohttp.ClientSession) -> Optional[Fo
             "User-Agent": "Mozilla/5.0 (compatible; FluBot/1.0)",
             "Accept": "application/json",
         }
+        epidata_key = os.getenv("DELPHI_EPIDATA_KEY", "")
+        if epidata_key:
+            headers["Epidata-API-Key"] = epidata_key
         async with session.get(
             url,
             timeout=aiohttp.ClientTimeout(total=15),
             headers=headers,
             ssl=_make_ssl_ctx(),
         ) as resp:
+            if resp.status == 401:
+                logger.warning("Delphi COVIDcast returned 401 — API key may be required. "
+                               "Set DELPHI_EPIDATA_KEY in .env (register at https://api.delphi.cmu.edu/epidata/admin/registration_form)")
+                return None
             if resp.status != 200:
                 logger.warning(f"Delphi COVIDcast returned {resp.status}")
                 return None
@@ -155,19 +163,26 @@ async def _fetch_delphi_fluview(session: aiohttp.ClientSession) -> Optional[Fore
     url = (
         f"https://api.delphi.cmu.edu/epidata/fluview/"
         f"?regions=nat"
-        f"&epiweeks={start_ew}:{current_ew}"
+        f"&epiweeks={start_ew}-{current_ew}"
     )
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; FluBot/1.0)",
             "Accept": "application/json",
         }
+        epidata_key = os.getenv("DELPHI_EPIDATA_KEY", "")
+        if epidata_key:
+            headers["Epidata-API-Key"] = epidata_key
         async with session.get(
             url,
             timeout=aiohttp.ClientTimeout(total=15),
             headers=headers,
             ssl=_make_ssl_ctx(),
         ) as resp:
+            if resp.status == 401:
+                logger.warning("Delphi FluView returned 401 — API key may be required. "
+                               "Set DELPHI_EPIDATA_KEY in .env (register at https://api.delphi.cmu.edu/epidata/admin/registration_form)")
+                return None
             if resp.status != 200:
                 logger.warning(f"Delphi FluView returned {resp.status}")
                 return None
@@ -200,11 +215,10 @@ async def _fetch_delphi_fluview(session: aiohttp.ClientSession) -> Optional[Fore
 async def _fetch_cdc_ilinet(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
     """
     Fetch CDC ILINet weekly surveillance data.
-    The POST endpoint returns a ZIP containing ILINet.csv.
+    Primary: extract PercentWeightedILI from the init endpoint's embedded JSON data.
+    Fallback: POST endpoint returns a ZIP containing ILINet.csv.
     """
-    url = "https://gis.cdc.gov/grasp/flu2/PostPhase02DataDownload"
     try:
-        # First get available seasons from init endpoint
         init_url = "https://gis.cdc.gov/grasp/flu2/GetPhase02InitApp?appVersion=Public"
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; FluBot/1.0)",
@@ -221,18 +235,54 @@ async def _fetch_cdc_ilinet(session: aiohttp.ClientSession) -> Optional[Forecast
                 return None
             init_data = await resp.json()
 
+        # Primary: extract ILI from embedded weekly data in init response
+        # Structure: WHO_Virus_Counts_Summary_Cumulative.data[] =
+        #   [mmwrid, [[labtypeid, [[regiontypeid, [[regionid, [viruses...],
+        #     PercentPositive, PercentA, PercentB, PercentWeightedILI,
+        #     Baseline, elevated, PercentUnWeightedILI, ...]]]]]]]
+        summary = init_data.get("WHO_Virus_Counts_Summary_Cumulative", {})
+        weekly_data = summary.get("data", [])
+        if weekly_data:
+            # Get the most recent week (last entry)
+            latest_week = weekly_data[-1]
+            # mmwrid is first element
+            mmwrid = latest_week[0] if latest_week else None
+            # Navigate: labtypes[0] -> regiontypes -> regions -> get PercentWeightedILI
+            try:
+                labtypes = latest_week[1]  # [[labtypeid, [...]]]
+                for labtype_entry in labtypes:
+                    labtype_data = labtype_entry[1]  # [[regiontypeid, [...]]]
+                    for regiontype_entry in labtype_data:
+                        regiontype_data = regiontype_entry[1]  # [[regionid, [viruses...], stats...]]
+                        for region_entry in regiontype_data:
+                            # region_entry = [regionid, [viruses...], PP, PA, PB, PWILI, ...]
+                            # PercentWeightedILI is at index position after virus list
+                            # Structure: [regionid, [[virus data...]], PP, PA, PB, PWILI, Baseline, elevated, PUWILI, ...]
+                            if len(region_entry) >= 7:
+                                # Index: 0=regionid, 1=viruses, 2=PP, 3=PA, 4=PB, 5=PWILI
+                                weighted_ili = float(region_entry[5])
+                                if weighted_ili > 0:
+                                    logger.info(f"CDC ILINet (init JSON): weighted ILI = {weighted_ili:.2f}% (mmwrid={mmwrid})")
+                                    return ForecastSource(
+                                        provider="cdc_ilinet",
+                                        value=weighted_ili,
+                                        model_name="CDC ILINet Weekly",
+                                    )
+            except (IndexError, TypeError, ValueError) as e:
+                logger.warning(f"CDC ILINet: failed to parse init JSON structure: {e}")
+
+        # Fallback: try the CSV download
         seasons = init_data.get("seasons", [])
         if not seasons:
             logger.warning("CDC ILINet: no seasons available")
             return None
 
-        # Use the most recent season (first in list — sorted desc)
         latest_season_id = seasons[0].get("seasonid", 62)
-
+        url = "https://gis.cdc.gov/grasp/flu2/PostPhase02DataDownload"
         payload = {
             "AppVersion": "Public",
             "DatasourceDT": [{"ID": 1, "Name": "ILINet"}],
-            "RegionTypeId": 3,  # National
+            "RegionTypeId": 3,
             "SubRegionsDT": [{"ID": 0, "Name": ""}],
             "SeasonsDT": [{"ID": latest_season_id, "Name": ""}],
         }
@@ -252,7 +302,6 @@ async def _fetch_cdc_ilinet(session: aiohttp.ClientSession) -> Optional[Forecast
                 return None
             zip_bytes = await resp.read()
 
-        # Response is a ZIP file containing ILINet.csv
         try:
             zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
         except zipfile.BadZipFile:
@@ -279,7 +328,6 @@ async def _fetch_cdc_ilinet(session: aiohttp.ClientSession) -> Optional[Forecast
             logger.warning("CDC ILINet: CSV has no data rows")
             return None
 
-        # Find weighted ILI in last row
         latest = rows[-1]
         weighted_ili = None
         for key in [
@@ -297,7 +345,6 @@ async def _fetch_cdc_ilinet(session: aiohttp.ClientSession) -> Optional[Forecast
                     pass
 
         if weighted_ili is None or weighted_ili <= 0:
-            # Try unweighted ILI
             for key in ["%UNWEIGHTED ILI", "% UNWEIGHTED ILI", "UNWEIGHTED ILI"]:
                 if key in latest:
                     try:

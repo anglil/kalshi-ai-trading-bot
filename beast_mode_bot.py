@@ -69,9 +69,9 @@ class BeastModeBot:
         self.logger = get_trading_logger("beast_mode_bot")
         self.shutdown_event = asyncio.Event()
         
-        # Set live trading in settings
-        settings.trading.live_trading_enabled = live_mode
-        settings.trading.paper_trading_mode = not live_mode
+        # AI directional always paper — consensus strategies manage their own mode
+        settings.trading.live_trading_enabled = False
+        settings.trading.paper_trading_mode = True
         
         self.logger.info(
             f"🚀 Beast Mode Bot initialized - "
@@ -94,6 +94,8 @@ class BeastModeBot:
         try:
             self.logger.info("🚀 BEAST MODE TRADING BOT STARTED")
             self.logger.info(f"📊 Trading Mode: {'LIVE' if self.live_mode else 'PAPER'}")
+            self.logger.info(f"   AI Directional: PAPER (always)")
+            self.logger.info(f"   Consensus strategies: {'LIVE' if self.live_mode else 'PAPER'} (based on --live flag)")
             self.logger.info(f"💰 Daily AI Budget: ${settings.trading.daily_ai_budget}")
             self.logger.info(f"⚡ Features: Weather Trading + Market Making + Portfolio Optimization + Dynamic Exits")
             
@@ -234,12 +236,20 @@ class BeastModeBot:
         try:
             balance_response = await kalshi_client.get_balance()
             cash = balance_response.get('balance', 0) / 100
-            position_value = balance_response.get('portfolio_value', 0) / 100
-            total = cash + position_value
 
+            # Calculate position value from actual Kalshi positions
             positions_response = await kalshi_client.get_positions()
             active = [p for p in positions_response.get('market_positions', [])
                       if p.get('position', 0) != 0]
+
+            position_value = 0.0
+            for pos in active:
+                qty = abs(pos.get('position', 0))
+                # Use market_price if available, otherwise estimate from resting orders
+                market_price = pos.get('market_price', 50)  # cents
+                position_value += qty * market_price / 100.0
+
+            total = cash + position_value
 
             recorded = await db_manager.record_portfolio_snapshot(
                 cash=cash,
@@ -359,7 +369,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"⛽ Starting Gas Price Trading Cycle #{cycle}")
-                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
+                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(
@@ -382,7 +392,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"📈 Starting Econ Data Trading Cycle #{cycle}")
-                results = await run_econ_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
+                results = await run_econ_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(
@@ -405,7 +415,7 @@ class BeastModeBot:
             try:
                 cycle += 1
                 self.logger.info(f"🤒 Starting Flu/ILI Trading Cycle #{cycle}")
-                results = await run_flu_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
+                results = await run_flu_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(

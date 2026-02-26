@@ -1,17 +1,18 @@
 """
 Multi-Source Gas Price Client
 
-Fetches national average gas price data from 3 free providers concurrently:
-  1. EIA (Energy Information Administration) — weekly national average (needs free API key)
+Fetches national average gas price data from 3 independent free sources:
+  1. FRED (St. Louis Fed) — EIA weekly national average via CSV (no key needed)
   2. AAA (American Automobile Association) — HTML scrape of national average
-  3. GasBuddy — HTML scrape of national average
+  3. EIA Public — HTML scrape of EIA Gas Diesel page (no key needed)
 
-EIA requires a free API key (register at eia.gov). AAA and GasBuddy need no keys.
+All 3 sources require no API keys. 3 sources enables majority-vote consensus.
 """
 
 import asyncio
 import aiohttp
-import os
+import csv
+import io
 import re
 import ssl
 import time
@@ -51,54 +52,52 @@ def _make_ssl_ctx() -> ssl.SSLContext:
     return ctx
 
 
-async def _fetch_eia(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
+async def _fetch_fred_gas(session: aiohttp.ClientSession) -> Optional[ForecastSource]:
     """
-    Fetch weekly national average gas price from EIA API.
-    Requires EIA_API_KEY environment variable.
+    Fetch weekly national average gas price from FRED CSV download.
+    Series GASREGW = U.S. Regular All Formulations Gas Price, Weekly.
+    This is the same EIA data served as a free CSV — no API key needed.
     """
-    api_key = os.getenv("EIA_API_KEY", "")
-    if not api_key:
-        logger.warning("EIA_API_KEY not set — skipping EIA source")
-        return None
-
-    url = (
-        f"https://api.eia.gov/v2/petroleum/pri/gnd/data/"
-        f"?api_key={api_key}"
-        f"&frequency=weekly"
-        f"&data[0]=value"
-        f"&facets[product][]=EPMR"
-        f"&facets[duoarea][]=NUS"
-        f"&sort[0][column]=period"
-        f"&sort[0][direction]=desc"
-        f"&length=1"
-    )
+    url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=GASREGW"
     try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; GasBot/1.0)",
+            "Accept": "text/csv,*/*",
+        }
         async with session.get(
             url,
             timeout=aiohttp.ClientTimeout(total=15),
+            headers=headers,
             ssl=_make_ssl_ctx(),
         ) as resp:
             if resp.status != 200:
-                logger.warning(f"EIA API returned {resp.status}")
+                logger.warning(f"FRED gas price CSV returned {resp.status}")
                 return None
-            data = await resp.json()
+            text = await resp.text()
 
-        records = data.get("response", {}).get("data", [])
-        if not records:
-            logger.warning("EIA API: no data records returned")
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+        if not rows:
+            logger.warning("FRED gas: no data rows in CSV")
             return None
 
-        price = float(records[0].get("value", 0))
-        if price <= 0:
+        last = rows[-1]
+        price_str = last.get("GASREGW", "")
+        if not price_str or price_str == ".":
+            logger.warning("FRED gas: latest value is missing")
+            return None
+
+        price = float(price_str)
+        if price <= 0 or price > 10:
             return None
 
         return ForecastSource(
-            provider="eia",
+            provider="fred",
             value=price,
-            model_name="EIA Weekly National Average",
+            model_name="FRED/EIA Weekly National Average",
         )
     except Exception as e:
-        logger.warning(f"EIA fetch failed: {e}")
+        logger.warning(f"FRED gas fetch failed: {e}")
         return None
 
 
@@ -110,8 +109,10 @@ async def _fetch_aaa_gas(session: aiohttp.ClientSession) -> Optional[ForecastSou
     url = "https://gasprices.aaa.com/"
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            "Accept": "text/html",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://gasprices.aaa.com/",
         }
         async with session.get(
             url,
@@ -152,8 +153,10 @@ async def _fetch_eia_public(session: aiohttp.ClientSession) -> Optional[Forecast
     url = "https://www.eia.gov/petroleum/gasdiesel/"
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            "Accept": "text/html",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.eia.gov/petroleum/",
         }
         async with session.get(
             url,
@@ -190,6 +193,7 @@ async def fetch_gas_forecasts() -> MultiSourceForecast:
     """
     Fetch gas price data from all 3 providers concurrently.
     Returns a MultiSourceForecast with whatever sources succeeded.
+    3 sources enables majority-vote consensus (2/3 agree = medium, 3/3 = high).
     """
     cache_key = "national_gas"
     if cache_key in _cache:
@@ -200,13 +204,13 @@ async def fetch_gas_forecasts() -> MultiSourceForecast:
     result = MultiSourceForecast(target="national_gas_price")
 
     async with aiohttp.ClientSession() as session:
-        eia_task = _fetch_eia(session)
+        fred_task = _fetch_fred_gas(session)
         aaa_task = _fetch_aaa_gas(session)
         eia_pub_task = _fetch_eia_public(session)
 
-        outcomes = await asyncio.gather(eia_task, aaa_task, eia_pub_task, return_exceptions=True)
+        outcomes = await asyncio.gather(fred_task, aaa_task, eia_pub_task, return_exceptions=True)
 
-    provider_names = ["eia", "aaa", "eia_public"]
+    provider_names = ["fred", "aaa", "eia_public"]
     for name, outcome in zip(provider_names, outcomes):
         if isinstance(outcome, Exception):
             logger.warning(f"Provider {name} raised exception: {outcome}")

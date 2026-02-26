@@ -218,15 +218,14 @@ async def run_consensus_weather_cycle(
         "total_position_value": 0.0,
     }
 
-    # Get available balance
+    # Get total portfolio value (cash + positions) for proper bankroll sizing
     try:
-        balance_response = await kalshi_client.get_balance()
-        bankroll = balance_response.get("balance", 0) / 100.0
+        bankroll = await kalshi_client.get_total_portfolio_value()
     except Exception as e:
-        logger.error(f"Could not fetch balance: {e}")
+        logger.error(f"Could not fetch portfolio value: {e}")
         return results
 
-    # Use full available balance — no new deposits, trade only with what's in the account
+    # Use full portfolio value for bankroll — position sizing uses max_position_pct to limit risk
     weather_bankroll = bankroll
     if weather_bankroll < 5.0:
         logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f}")

@@ -1,8 +1,11 @@
 """
 Economic Data Consensus Trading Strategy
 
-Uses multi-source economic nowcast consensus (Atlanta Fed + Cleveland Fed +
-NY Fed) to trade Kalshi economic indicator bracket markets (CPI, NFP, GDP).
+Uses 3-source majority-vote consensus per indicator to trade Kalshi
+economic bracket markets:
+  CPI: BLS CPI-U NSA + FRED CPI-U SA + FRED Core CPI (all YoY %)
+  NFP: BLS Total Nonfarm + FRED PAYEMS + FRED CPS Household (all MoM K)
+  GDP: FRED GDPNow + FRED GDP Official + FRED GDI (all Q/Q SAAR %)
 
 Mirrors the weather consensus pattern with econ-specific parameters.
 """
@@ -154,7 +157,7 @@ async def _discover_econ_markets(
             markets_response = await kalshi_client.get_markets(
                 limit=100,
                 series_ticker=series,
-                status="active",
+                status="open",
             )
             markets = markets_response.get("markets", [])
             if not markets:
@@ -172,7 +175,7 @@ async def _discover_econ_markets(
                 )
 
             for market in markets:
-                if market.get("status") != "active":
+                if market.get("status") not in ("active", "open"):
                     continue
                 bracket = _parse_econ_bracket(market, indicator)
                 if bracket:
@@ -368,10 +371,9 @@ async def run_econ_consensus_cycle(
         bankroll = 1000.0
     else:
         try:
-            balance_response = await kalshi_client.get_balance()
-            bankroll = balance_response.get("balance", 0) / 100.0
+            bankroll = await kalshi_client.get_total_portfolio_value()
         except Exception as e:
-            logger.error(f"Could not fetch balance: {e}")
+            logger.error(f"Could not fetch portfolio value: {e}")
             return results
 
         if bankroll < 5.0:

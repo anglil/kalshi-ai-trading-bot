@@ -355,12 +355,33 @@ class PositionLimitsManager:
             return 0.0
     
     async def _close_position(self, candidate: PositionToClose) -> bool:
-        """Close a position (mark as closed in database)."""
+        """Close a position by selling on Kalshi, then mark as closed in database."""
         try:
-            # Update position status to closed
+            import uuid
+
+            # Actually sell the position on Kalshi exchange
+            try:
+                order_response = await self.kalshi_client.place_order(
+                    ticker=candidate.market_id,
+                    client_order_id=str(uuid.uuid4()),
+                    side=candidate.side.lower(),
+                    action="sell",
+                    count=1,  # Sell all contracts — Kalshi will cap at actual holding
+                    type_="market",
+                )
+                self.logger.info(
+                    f"Position {candidate.market_id} sold on Kalshi: {order_response}"
+                )
+            except Exception as sell_err:
+                self.logger.warning(
+                    f"Could not sell {candidate.market_id} on Kalshi: {sell_err}. "
+                    f"Keeping position open in DB to retry later."
+                )
+                return False  # Don't mark as closed if we couldn't actually sell
+
+            # Update position status to closed only after successful sell
             await self.db_manager.update_position_status(candidate.position_id, "closed")
-            
-            # Log the closure
+
             self.logger.info(f"Position {candidate.market_id} closed due to position limits")
             
             return True
