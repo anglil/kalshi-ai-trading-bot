@@ -26,6 +26,7 @@ import time
 import signal
 from datetime import datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from src.jobs.trade import run_trading_job
 from src.jobs.ingest import run_ingestion
@@ -78,6 +79,32 @@ class BeastModeBot:
             f"Mode: {'LIVE TRADING' if live_mode else 'PAPER TRADING'}"
         )
 
+    def _is_night_mode(self) -> bool:
+        """
+        Check if we are in night mode (low-liquidity overnight hours).
+
+        During night mode, no new trades are opened. Position tracking and
+        exits continue to run normally.
+
+        Returns True if current US/Eastern hour is within the configured
+        night window (default 11 PM – 7 AM ET).
+        """
+        if not settings.trading.night_mode_enabled:
+            return False
+
+        eastern = ZoneInfo("US/Eastern")
+        now_et = datetime.now(eastern)
+        hour = now_et.hour
+
+        start = settings.trading.night_mode_start_hour
+        end = settings.trading.night_mode_end_hour
+
+        # Handle wrap-around midnight (e.g. start=23, end=7)
+        if start > end:
+            return hour >= start or hour < end
+        else:
+            return start <= hour < end
+
     async def run_dashboard_mode(self):
         """Run in live dashboard mode with real-time updates."""
         try:
@@ -98,6 +125,11 @@ class BeastModeBot:
             self.logger.info(f"   Consensus strategies: {'LIVE' if self.live_mode else 'PAPER'} (based on --live flag)")
             self.logger.info(f"💰 Daily AI Budget: ${settings.trading.daily_ai_budget}")
             self.logger.info(f"⚡ Features: Weather Trading + Market Making + Portfolio Optimization + Dynamic Exits")
+            if settings.trading.night_mode_enabled:
+                self.logger.info(
+                    f"🌙 Night Mode: ENABLED ({settings.trading.night_mode_start_hour}:00–"
+                    f"{settings.trading.night_mode_end_hour}:00 ET — no new trades)"
+                )
             
             # 🚨 CRITICAL FIX: Initialize database FIRST and wait for completion
             self.logger.info("🔧 Initializing database...")
@@ -199,6 +231,12 @@ class BeastModeBot:
 
         while not self.shutdown_event.is_set():
             try:
+                # Night mode: skip new trades, sleep and retry
+                if self._is_night_mode():
+                    self.logger.info("🌙 Night mode active — skipping AI trading cycle")
+                    await asyncio.sleep(300)  # Check again in 5 minutes
+                    continue
+
                 # Check daily AI cost limits before starting cycle
                 if not await self._check_daily_ai_limits(xai_client):
                     # Sleep until next day if limits reached
@@ -344,6 +382,12 @@ class BeastModeBot:
         cycle = 0
         while not self.shutdown_event.is_set():
             try:
+                # Night mode: skip new weather trades
+                if self._is_night_mode():
+                    self.logger.info("🌙 Night mode active — skipping weather trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
                 cycle += 1
                 self.logger.info(f"🌤️ Starting Weather Trading Cycle #{cycle}")
                 results = await run_consensus_weather_cycle(kalshi_client, db_manager)
@@ -367,6 +411,12 @@ class BeastModeBot:
         cycle = 0
         while not self.shutdown_event.is_set():
             try:
+                # Night mode: skip new gas trades
+                if self._is_night_mode():
+                    self.logger.info("🌙 Night mode active — skipping gas trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
                 cycle += 1
                 self.logger.info(f"⛽ Starting Gas Price Trading Cycle #{cycle}")
                 results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
@@ -390,6 +440,12 @@ class BeastModeBot:
         cycle = 0
         while not self.shutdown_event.is_set():
             try:
+                # Night mode: skip new econ trades
+                if self._is_night_mode():
+                    self.logger.info("🌙 Night mode active — skipping econ trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
                 cycle += 1
                 self.logger.info(f"📈 Starting Econ Data Trading Cycle #{cycle}")
                 results = await run_econ_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
@@ -413,6 +469,12 @@ class BeastModeBot:
         cycle = 0
         while not self.shutdown_event.is_set():
             try:
+                # Night mode: skip new flu trades
+                if self._is_night_mode():
+                    self.logger.info("🌙 Night mode active — skipping flu trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
                 cycle += 1
                 self.logger.info(f"🤒 Starting Flu/ILI Trading Cycle #{cycle}")
                 results = await run_flu_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)

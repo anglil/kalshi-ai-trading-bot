@@ -125,6 +125,11 @@ class TradingConfig:
     enable_daily_cost_limiting: bool = True  # Enable daily cost limits
     sleep_when_limit_reached: bool = True  # Sleep until next day when limit reached
 
+    # Night mode - pause new trade entry during low-liquidity overnight hours
+    night_mode_enabled: bool = True         # Enable night mode to stop new trades at night
+    night_mode_start_hour: int = 23         # Hour (0-23) in US/Eastern when night mode starts (11 PM)
+    night_mode_end_hour: int = 7            # Hour (0-23) in US/Eastern when night mode ends (7 AM)
+
     # Enhanced market filtering to reduce analyses - MORE PERMISSIVE
     min_volume_for_ai_analysis: float = 200.0  # DECREASED: Much lower threshold (was 500, now 200)
     exclude_low_liquidity_categories: List[str] = field(default_factory=lambda: [
