@@ -175,12 +175,22 @@ async def _discover_flu_markets(kalshi_client: KalshiClient) -> List[Temperature
             markets_response = await kalshi_client.get_markets(
                 limit=100,
                 series_ticker=series,
+                status="active",
             )
             markets = markets_response.get("markets", [])
             if not markets:
                 continue
 
             logger.info(f"Found {len(markets)} markets for series '{series}'")
+
+            # Diagnostic: log first 3 markets' raw fields for debugging parsers
+            for m in markets[:3]:
+                logger.debug(
+                    f"RAW MARKET: ticker={m.get('ticker')}, title={m.get('title')!r}, "
+                    f"status={m.get('status')}, floor_strike={m.get('floor_strike')}, "
+                    f"cap_strike={m.get('cap_strike')}, yes_price={m.get('yes_price')}, "
+                    f"subtitle={m.get('subtitle')!r}"
+                )
 
             for market in markets:
                 if market.get("status") != "active":
@@ -229,12 +239,23 @@ def _parse_flu_bracket(market: dict) -> Optional[TemperatureBracket]:
     low = None
     high = None
 
-    # First check for categorical level mentions
-    for level, (level_low, level_high) in LEVEL_TO_NUMERIC.items():
-        if level.replace("_", " ") in title:
-            low = level_low
-            high = level_high
-            break
+    # Try structured API fields first (floor_strike / cap_strike)
+    floor_strike = market.get("floor_strike")
+    cap_strike = market.get("cap_strike")
+    if floor_strike is not None:
+        # floor_strike is in ILI% → multiply by 100 for bracket scale
+        low = int(round(float(floor_strike) * 100))
+    if cap_strike is not None:
+        high = int(round(float(cap_strike) * 100))
+
+    # Fall through to categorical/regex only if structured fields didn't work
+    if low is None and high is None:
+        # First check for categorical level mentions
+        for level, (level_low, level_high) in LEVEL_TO_NUMERIC.items():
+            if level.replace("_", " ") in title:
+                low = level_low
+                high = level_high
+                break
 
     # If no categorical match, try numeric ILI% patterns
     if low is None and high is None:
@@ -252,6 +273,7 @@ def _parse_flu_bracket(market: dict) -> Optional[TemperatureBracket]:
             high = int(round(float(below_pct.group(1)) * 100))
 
     if low is None and high is None:
+        logger.debug(f"PARSE FAIL: title={title!r}, ticker={ticker}")
         return None
 
     return TemperatureBracket(
@@ -375,16 +397,19 @@ async def run_flu_consensus_cycle(
     )
 
     # 5. Generate trade signals
-    try:
-        balance_response = await kalshi_client.get_balance()
-        bankroll = balance_response.get("balance", 0) / 100.0
-    except Exception as e:
-        logger.error(f"Could not fetch balance: {e}")
-        return results
+    if paper_mode:
+        bankroll = 1000.0
+    else:
+        try:
+            balance_response = await kalshi_client.get_balance()
+            bankroll = balance_response.get("balance", 0) / 100.0
+        except Exception as e:
+            logger.error(f"Could not fetch balance: {e}")
+            return results
 
-    if bankroll < 5.0:
-        logger.warning(f"FLU CONSENSUS: Insufficient bankroll: ${bankroll:.2f}")
-        return results
+        if bankroll < 5.0:
+            logger.warning(f"FLU CONSENSUS: Insufficient bankroll: ${bankroll:.2f}")
+            return results
 
     signals = generate_weather_signals(
         brackets=brackets,

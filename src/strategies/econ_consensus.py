@@ -154,12 +154,22 @@ async def _discover_econ_markets(
             markets_response = await kalshi_client.get_markets(
                 limit=100,
                 series_ticker=series,
+                status="active",
             )
             markets = markets_response.get("markets", [])
             if not markets:
                 continue
 
             logger.info(f"Found {len(markets)} markets for series '{series}' ({indicator.name})")
+
+            # Diagnostic: log first 3 markets' raw fields for debugging parsers
+            for m in markets[:3]:
+                logger.debug(
+                    f"RAW MARKET: ticker={m.get('ticker')}, title={m.get('title')!r}, "
+                    f"status={m.get('status')}, floor_strike={m.get('floor_strike')}, "
+                    f"cap_strike={m.get('cap_strike')}, yes_price={m.get('yes_price')}, "
+                    f"subtitle={m.get('subtitle')!r}"
+                )
 
             for market in markets:
                 if market.get("status") != "active":
@@ -209,46 +219,64 @@ def _parse_econ_bracket(market: dict, indicator: EconIndicator) -> Optional[Temp
     low = None
     high = None
 
-    if indicator.name == "NFP":
-        # NFP brackets: "XK-YK", ">XK", "<XK", "X,000 to Y,000"
-        range_k = re.search(r'(\d+)\s*[Kk]\s*[-–to]+\s*(\d+)\s*[Kk]', title)
-        range_full = re.search(r'(\d[\d,]*)\s*[-–to]+\s*(\d[\d,]*)', title)
-        above_k = re.search(r'(?:above|>|over|at least)\s*(\d+)\s*[Kk]', title, re.IGNORECASE)
-        below_k = re.search(r'(?:below|<|under|at most)\s*(\d+)\s*[Kk]', title, re.IGNORECASE)
-        above_full = re.search(r'(?:above|>|over|at least)\s*(\d[\d,]*)', title, re.IGNORECASE)
-        below_full = re.search(r'(?:below|<|under|at most)\s*(\d[\d,]*)', title, re.IGNORECASE)
+    # Try structured API fields first (floor_strike / cap_strike)
+    floor_strike = market.get("floor_strike")
+    cap_strike = market.get("cap_strike")
+    if floor_strike is not None or cap_strike is not None:
+        if indicator.name == "NFP":
+            # NFP: floor_strike is in thousands → use directly (K scale)
+            if floor_strike is not None:
+                low = int(round(float(floor_strike)))
+            if cap_strike is not None:
+                high = int(round(float(cap_strike)))
+        else:
+            # CPI/GDP: floor_strike is in % → multiply by 100 for basis points
+            if floor_strike is not None:
+                low = int(round(float(floor_strike) * 100))
+            if cap_strike is not None:
+                high = int(round(float(cap_strike) * 100))
 
-        if range_k:
-            low = int(range_k.group(1))
-            high = int(range_k.group(2))
-        elif above_k and not below_k:
-            low = int(above_k.group(1))
-        elif below_k and not above_k:
-            high = int(below_k.group(1))
-        elif range_full:
-            low = int(range_full.group(1).replace(",", "")) // 1000
-            high = int(range_full.group(2).replace(",", "")) // 1000
-        elif above_full and not below_full:
-            low = int(above_full.group(1).replace(",", "")) // 1000
-        elif below_full and not above_full:
-            high = int(below_full.group(1).replace(",", "")) // 1000
-    else:
-        # CPI/GDP: percentage brackets
-        # Scale: multiply by 100 to get integer basis points for bracket math
-        # e.g. 2.5% → 250 bps
-        range_pct = re.search(r'(-?\d+\.?\d*)\s*%?\s*[-–to]+\s*(-?\d+\.?\d*)\s*%', title)
-        above_pct = re.search(r'(?:above|>|over|at least)\s*(-?\d+\.?\d*)\s*%', title, re.IGNORECASE)
-        below_pct = re.search(r'(?:below|<|under|at most)\s*(-?\d+\.?\d*)\s*%', title, re.IGNORECASE)
+    # Fall through to regex only if structured fields didn't provide brackets
+    if low is None and high is None:
+        if indicator.name == "NFP":
+            # NFP brackets: "XK-YK", ">XK", "<XK", "X,000 to Y,000"
+            range_k = re.search(r'(\d+)\s*[Kk]\s*[-–to]+\s*(\d+)\s*[Kk]', title)
+            range_full = re.search(r'(\d[\d,]*)\s*[-–to]+\s*(\d[\d,]*)', title)
+            above_k = re.search(r'(?:above|>|over|at least)\s*(\d+)\s*[Kk]', title, re.IGNORECASE)
+            below_k = re.search(r'(?:below|<|under|at most)\s*(\d+)\s*[Kk]', title, re.IGNORECASE)
+            above_full = re.search(r'(?:above|>|over|at least)\s*(\d[\d,]*)', title, re.IGNORECASE)
+            below_full = re.search(r'(?:below|<|under|at most)\s*(\d[\d,]*)', title, re.IGNORECASE)
 
-        if range_pct:
-            low = int(round(float(range_pct.group(1)) * 100))
-            high = int(round(float(range_pct.group(2)) * 100))
-        elif above_pct and not below_pct:
-            low = int(round(float(above_pct.group(1)) * 100))
-        elif below_pct and not above_pct:
-            high = int(round(float(below_pct.group(1)) * 100))
+            if range_k:
+                low = int(range_k.group(1))
+                high = int(range_k.group(2))
+            elif above_k and not below_k:
+                low = int(above_k.group(1))
+            elif below_k and not above_k:
+                high = int(below_k.group(1))
+            elif range_full:
+                low = int(range_full.group(1).replace(",", "")) // 1000
+                high = int(range_full.group(2).replace(",", "")) // 1000
+            elif above_full and not below_full:
+                low = int(above_full.group(1).replace(",", "")) // 1000
+            elif below_full and not above_full:
+                high = int(below_full.group(1).replace(",", "")) // 1000
+        else:
+            # CPI/GDP: percentage brackets
+            range_pct = re.search(r'(-?\d+\.?\d*)\s*%?\s*[-–to]+\s*(-?\d+\.?\d*)\s*%', title)
+            above_pct = re.search(r'(?:above|>|over|at least)\s*(-?\d+\.?\d*)\s*%', title, re.IGNORECASE)
+            below_pct = re.search(r'(?:below|<|under|at most)\s*(-?\d+\.?\d*)\s*%', title, re.IGNORECASE)
+
+            if range_pct:
+                low = int(round(float(range_pct.group(1)) * 100))
+                high = int(round(float(range_pct.group(2)) * 100))
+            elif above_pct and not below_pct:
+                low = int(round(float(above_pct.group(1)) * 100))
+            elif below_pct and not above_pct:
+                high = int(round(float(below_pct.group(1)) * 100))
 
     if low is None and high is None:
+        logger.debug(f"PARSE FAIL: title={title!r}, ticker={ticker}, indicator={indicator.name}")
         return None
 
     return TemperatureBracket(
@@ -336,16 +364,19 @@ async def run_econ_consensus_cycle(
     }
 
     # Get available balance
-    try:
-        balance_response = await kalshi_client.get_balance()
-        bankroll = balance_response.get("balance", 0) / 100.0
-    except Exception as e:
-        logger.error(f"Could not fetch balance: {e}")
-        return results
+    if paper_mode:
+        bankroll = 1000.0
+    else:
+        try:
+            balance_response = await kalshi_client.get_balance()
+            bankroll = balance_response.get("balance", 0) / 100.0
+        except Exception as e:
+            logger.error(f"Could not fetch balance: {e}")
+            return results
 
-    if bankroll < 5.0:
-        logger.warning(f"ECON CONSENSUS: Insufficient bankroll: ${bankroll:.2f}")
-        return results
+        if bankroll < 5.0:
+            logger.warning(f"ECON CONSENSUS: Insufficient bankroll: ${bankroll:.2f}")
+            return results
 
     all_signals: List[WeatherTradeSignal] = []
 
