@@ -815,6 +815,17 @@ new Chart(document.getElementById('portfolioChart'), {{
 
 
 async def main():
+    print(f"Python: {sys.version}")
+    print(f"CWD: {os.getcwd()}")
+    print(f"KALSHI_API_KEY set: {bool(os.getenv('KALSHI_API_KEY'))}")
+    print(f"Private key file exists: {os.path.exists('kalshi_private_key')}")
+    if os.path.exists('kalshi_private_key'):
+        with open('kalshi_private_key', 'r') as f:
+            content = f.read()
+        print(f"Private key file size: {len(content)} bytes")
+        print(f"Private key starts with: {content[:30]}")
+        print(f"Private key ends with: ...{content[-30:].strip()}")
+    print(f".env file exists: {os.path.exists('.env')}")
     print("Fetching live data from Kalshi API...")
     data = await fetch_data()
     print("Processing metrics...")
@@ -822,7 +833,7 @@ async def main():
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
     print("Generating dashboard HTML...")
     html = generate_html(metrics, generated_at)
-    output_path = '/home/ubuntu/kalshi-ai-trading-bot/dashboard.html'
+    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.html')
     with open(output_path, 'w') as f:
         f.write(html)
     print(f"Dashboard saved to: {output_path}")
@@ -837,4 +848,10 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        import traceback
+        print(f"FATAL ERROR: {e}")
+        traceback.print_exc()
+        sys.exit(1)
