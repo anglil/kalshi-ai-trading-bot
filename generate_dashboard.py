@@ -94,6 +94,36 @@ def build_portfolio_timeline(fills, balance_now, portfolio_value_now):
     return timeline, deposit
 
 
+def kalshi_market_url(ticker):
+    """
+    Build the Kalshi market page URL from a ticker.
+    URL pattern: https://kalshi.com/markets/{series_lower}/{series_slug}/{ticker_lower}
+    The series ticker is the alphabetic prefix of the market ticker (before the first digit).
+    """
+    import re
+    ticker = ticker.strip()
+    # Extract series ticker: everything up to the first digit
+    match = re.match(r'^([A-Za-z]+)', ticker)
+    series = match.group(1).lower() if match else ticker.lower()
+    # Build a human-readable slug from the series (strip leading 'kx')
+    slug_map = {
+        'kxhighchi': 'highest-temperature-in-chicago',
+        'kxhighny': 'highest-temperature-in-new-york',
+        'kxhighmia': 'highest-temperature-in-miami',
+        'kxhighaus': 'highest-temperature-in-austin',
+        'kxhighdal': 'highest-temperature-in-dallas',
+        'kxhighla': 'highest-temperature-in-los-angeles',
+        'kxhighsea': 'highest-temperature-in-seattle',
+        'kxnbagame': 'nba-game-winner',
+        'kxcpi': 'cpi-month-over-month',
+        'kxgreenland': 'greenland',
+        'kxkhameneiout': 'khamenei-out',
+        'kxmediareleasest': 'media-release',
+    }
+    slug = slug_map.get(series, series.replace('kx', '', 1))
+    return f"https://kalshi.com/markets/{series}/{slug}/{ticker.lower()}"
+
+
 def categorize_ticker(ticker):
     """Categorize a market ticker into a strategy/category."""
     t = ticker.upper()
@@ -274,6 +304,7 @@ def generate_html(metrics, generated_at):
         pnl_class = 'text-green-400' if pnl > 0 else ('text-red-400' if pnl < 0 else 'text-slate-400')
         open_pos_rows.append({
             'ticker': p['event_ticker'],
+            'kalshi_url': kalshi_market_url(p['event_ticker']),
             'category': cat,
             'exposure': p.get('event_exposure_dollars', '0.00'),
             'cost': p.get('total_cost_dollars', '0.00'),
@@ -290,16 +321,18 @@ def generate_html(metrics, generated_at):
         ts = f.get('ts', 0)
         dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%m/%d %H:%M')
         action_class = 'text-green-400' if f.get('action') == 'buy' else 'text-red-400'
+        fill_ticker = f.get('ticker', '')
         fill_rows.append({
             'time': dt,
-            'ticker': f.get('ticker', ''),
+            'ticker': fill_ticker,
+            'kalshi_url': kalshi_market_url(fill_ticker) if fill_ticker else '#',
             'action': f.get('action', '').upper(),
             'side': f.get('side', '').upper(),
             'count': f.get('count', 0),
             'price': f"${f.get('price', 0)*100:.0f}¢",
             'fee': f"${float(f.get('fee_cost', 0)):.2f}",
             'action_class': action_class,
-            'category': categorize_ticker(f.get('ticker', '')),
+            'category': categorize_ticker(fill_ticker),
         })
 
     # 8. Category volume bar
@@ -500,7 +533,10 @@ def generate_html(metrics, generated_at):
             'Health': 'badge-green', 'Other': 'badge-gray'
         }.get(row['category'], 'badge-gray')
         html += f"""        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono text-slate-300">{row['ticker']}</td>
+          <td class="py-2 pr-3 font-mono">
+            <a href="{row['kalshi_url']}" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">{row['ticker']}</a>
+          </td>
           <td class="py-2 pr-3"><span class="badge {cat_badge}">{row['category']}</span></td>
           <td class="py-2 pr-3 text-right text-white">${row['exposure']}</td>
           <td class="py-2 pr-3 text-right text-slate-300">${row['cost']}</td>
@@ -546,7 +582,10 @@ def generate_html(metrics, generated_at):
         }.get(row['category'], 'badge-gray')
         html += f"""        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 text-slate-400">{row['time']}</td>
-          <td class="py-2 pr-3 font-mono text-slate-300 text-xs">{row['ticker'][:30]}</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="{row['kalshi_url']}" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">{row['ticker'][:30]}</a>
+          </td>
           <td class="py-2 pr-3"><span class="badge {cat_badge}">{row['category']}</span></td>
           <td class="py-2 pr-3 text-center"><span class="{row['action_class']} font-bold">{row['action']}</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">{row['side']}</td>
