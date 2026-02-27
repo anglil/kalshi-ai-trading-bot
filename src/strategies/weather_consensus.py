@@ -11,7 +11,8 @@ Falls back to NWS-only single-source logic when consensus is not possible.
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 from src.clients.nws_client import WEATHER_STATIONS, WeatherStation
 from src.clients.weather_forecast_client import (
@@ -32,6 +33,49 @@ from src.utils.database import DatabaseManager
 from src.utils.logging_setup import get_trading_logger
 
 logger = get_trading_logger("weather_consensus")
+
+# ============================================================
+# Risk management constants
+# ============================================================
+
+MAX_POSITIONS_PER_CITY = 3       # Max concurrent positions per city
+BRACKET_OVERLAP_THRESHOLD = 5    # °F — brackets within this range are "overlapping"
+
+
+# ============================================================
+# Helpers for ticker parsing
+# ============================================================
+
+def _extract_city_from_ticker(ticker: str) -> str:
+    """Extract city code from a weather ticker.
+
+    Ticker format: KXHIGH{CITY}-{DATE}-{BRACKET}
+    e.g. KXHIGHAUS-26FEB27-B85.5 → AUS
+    """
+    prefix = ticker.split('-')[0]
+    return prefix.replace('KXHIGH', '')
+
+
+def _parse_bracket_from_ticker(ticker: str) -> Optional[Tuple[str, float]]:
+    """Parse bracket type and threshold from the last segment of a ticker.
+
+    e.g. KXHIGHAUS-26FEB27-B85.5 → ("B", 85.5)
+         KXHIGHAUS-26FEB27-T83   → ("T", 83.0)
+
+    Returns None if the bracket segment cannot be parsed.
+    """
+    parts = ticker.split('-')
+    if len(parts) < 3:
+        return None
+    bracket_seg = parts[-1]  # e.g. "B85.5" or "T83"
+    if not bracket_seg:
+        return None
+    bracket_type = bracket_seg[0].upper()  # "B" or "T"
+    try:
+        threshold = float(bracket_seg[1:])
+    except (ValueError, IndexError):
+        return None
+    return (bracket_type, threshold)
 
 
 # ============================================================
@@ -317,15 +361,75 @@ async def run_consensus_weather_cycle(
 
     # Filter out signals for tickers where we already hold a position
     held_tickers = set()
+    city_position_counts: Dict[str, int] = defaultdict(int)
+    held_brackets: Dict[str, List[Tuple[str, str, float]]] = defaultdict(list)
     try:
         open_positions = await db_manager.get_open_live_positions()
         held_tickers = {p.market_id for p in open_positions}
+
+        # Build per-city counts and held bracket info for weather positions
+        for p in open_positions:
+            strat = getattr(p, 'strategy', '') or ''
+            if strat.startswith('weather') or strat == 'weather_consensus':
+                city = _extract_city_from_ticker(p.market_id)
+                city_position_counts[city] += 1
+
+                parsed = _parse_bracket_from_ticker(p.market_id)
+                if parsed:
+                    bracket_type, threshold = parsed
+                    held_brackets[city].append((p.side, bracket_type, threshold))
+
         if held_tickers:
             before = len(all_signals)
             all_signals = [s for s in all_signals if s.bracket.ticker not in held_tickers]
             skipped = before - len(all_signals)
             if skipped > 0:
                 logger.info(f"CONSENSUS: Filtered out {skipped} signals for already-held positions")
+
+        # Fix 1: Per-city concentration limit
+        before = len(all_signals)
+        filtered_signals = []
+        for sig in all_signals:
+            city = _extract_city_from_ticker(sig.bracket.ticker)
+            if city_position_counts[city] >= MAX_POSITIONS_PER_CITY:
+                logger.info(
+                    f"CITY LIMIT: Skipping {sig.bracket.ticker} {sig.side} — "
+                    f"{city} already has {city_position_counts[city]} positions"
+                )
+                continue
+            filtered_signals.append(sig)
+        all_signals = filtered_signals
+        city_skipped = before - len(all_signals)
+        if city_skipped > 0:
+            logger.info(f"CONSENSUS: Filtered out {city_skipped} signals due to per-city limit")
+
+        # Fix 2: Overlap filter — skip brackets that overlap existing held brackets
+        before = len(all_signals)
+        filtered_signals = []
+        for sig in all_signals:
+            city = _extract_city_from_ticker(sig.bracket.ticker)
+            parsed = _parse_bracket_from_ticker(sig.bracket.ticker)
+            if parsed and city in held_brackets:
+                sig_type, sig_threshold = parsed
+                dominated = False
+                for held_side, held_type, held_threshold in held_brackets[city]:
+                    if (held_side == sig.side
+                            and held_type == sig_type
+                            and abs(sig_threshold - held_threshold) <= BRACKET_OVERLAP_THRESHOLD):
+                        logger.info(
+                            f"OVERLAP SKIP: {sig.bracket.ticker} {sig.side} overlaps "
+                            f"existing {held_type}{held_threshold} {held_side} in {city}"
+                        )
+                        dominated = True
+                        break
+                if dominated:
+                    continue
+            filtered_signals.append(sig)
+        all_signals = filtered_signals
+        overlap_skipped = before - len(all_signals)
+        if overlap_skipped > 0:
+            logger.info(f"CONSENSUS: Filtered out {overlap_skipped} signals due to bracket overlap")
+
     except Exception as e:
         logger.warning(f"Could not check existing positions: {e}")
 
@@ -333,8 +437,15 @@ async def run_consensus_weather_cycle(
     for i, sig in enumerate(all_signals[:max_trades]):
         logger.info(f"  #{i+1}: {sig.rationale}")
 
-    # Execute
+    # Execute — update city_position_counts within cycle to enforce limits
     for signal in all_signals[:max_trades]:
+        city = _extract_city_from_ticker(signal.bracket.ticker)
+        if city_position_counts[city] >= MAX_POSITIONS_PER_CITY:
+            logger.info(
+                f"CITY LIMIT: Skipping {signal.bracket.ticker} {signal.side} — "
+                f"{city} hit limit during execution"
+            )
+            continue
         success = await execute_weather_trade(
             signal, kalshi_client, db_manager,
             strategy="weather_consensus",
@@ -342,6 +453,7 @@ async def run_consensus_weather_cycle(
         if success:
             results["orders_placed"] += 1
             results["total_position_value"] += signal.position_size_dollars
+            city_position_counts[city] += 1
 
     logger.info(
         f"CONSENSUS cycle complete: {results['cities_analyzed']} cities, "

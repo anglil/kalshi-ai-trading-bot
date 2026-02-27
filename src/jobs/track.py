@@ -46,9 +46,11 @@ async def should_exit_position(
     if current_price <= 0:
         return False, "", current_price
 
-    # Guard: weather/consensus positions hold to settlement — no stop-loss or take-profit
+    # Guard: only exempt weather/consensus positions with explicitly disabled stops (0.01 sentinel)
     strategy = getattr(position, 'strategy', '') or ''
-    if strategy.startswith('weather') or strategy.endswith('_consensus'):
+    is_weather_or_consensus = strategy.startswith('weather') or strategy.endswith('_consensus')
+    has_disabled_stops = (position.stop_loss_price is not None and position.stop_loss_price <= 0.01)
+    if is_weather_or_consensus and has_disabled_stops:
         return False, "", current_price
 
     # Guard: don't exit positions less than 5 minutes old (prevent race conditions)
