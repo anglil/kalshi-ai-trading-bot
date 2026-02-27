@@ -23,6 +23,10 @@ class APIConfig:
     # OpenRouter now points at Google AI Studio's OpenAI-compatible endpoint
     openrouter_api_key: str = field(default_factory=lambda: os.getenv("OPENROUTER_API_KEY", ""))
     eia_api_key: str = field(default_factory=lambda: os.getenv("EIA_API_KEY", ""))
+    # Sports data API keys (optional — sources skipped if empty)
+    odds_api_key: str = field(default_factory=lambda: os.getenv("ODDS_API_KEY", ""))
+    api_football_key: str = field(default_factory=lambda: os.getenv("API_FOOTBALL_KEY", ""))
+    football_data_key: str = field(default_factory=lambda: os.getenv("FOOTBALL_DATA_KEY", ""))
     openai_base_url: str = "https://api.openai.com/v1"
     openrouter_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
@@ -67,7 +71,7 @@ class TradingConfig:
     # Position sizing and risk management - MADE MORE AGGRESSIVE  
     max_position_size_pct: float = 5.0  # INCREASED: Back to 5% per position (was 3%)
     max_daily_loss_pct: float = 15.0    # INCREASED: Allow 15% daily loss (was 10%) 
-    max_positions: int = 15              # INCREASED: Allow 15 concurrent positions (was 10)
+    max_positions: int = 20              # INCREASED: Allow 20 concurrent positions (6 strategies)
     min_balance: float = 50.0           # REDUCED: Lower minimum to trade more (was 100)
     
     # Market filtering criteria - MUCH MORE PERMISSIVE

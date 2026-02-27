@@ -45,6 +45,8 @@ from src.strategies.weather_consensus import run_consensus_weather_cycle
 from src.strategies.gas_consensus import run_gas_consensus_cycle
 from src.strategies.econ_consensus import run_econ_consensus_cycle
 from src.strategies.flu_consensus import run_flu_consensus_cycle
+from src.strategies.nba_consensus import run_nba_consensus_cycle, _is_nba_game_hours
+from src.strategies.soccer_consensus import run_soccer_consensus_cycle
 from beast_mode_dashboard import BeastModeDashboard
 
 
@@ -166,6 +168,8 @@ class BeastModeBot:
                 asyncio.create_task(self._run_gas_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_econ_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_nba_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_soccer_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_trading_cycles(db_manager, kalshi_client, xai_client)),
                 asyncio.create_task(self._run_position_tracking(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_performance_evaluation(db_manager))
@@ -489,6 +493,68 @@ class BeastModeBot:
                 await asyncio.sleep(43200)
             except Exception as e:
                 self.logger.error(f"Error in flu trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_nba_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for NBA consensus trading (runs every 30 min during game hours)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(45)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                # NBA uses its own game-hours check (6 PM - 1 AM ET) instead of night mode
+                if not _is_nba_game_hours():
+                    self.logger.info("NBA: Outside game hours (6 PM - 1 AM ET) — skipping")
+                    await asyncio.sleep(600)  # Check again in 10 minutes
+                    continue
+
+                cycle += 1
+                self.logger.info(f"NBA: Starting NBA Trading Cycle #{cycle}")
+                results = await run_nba_consensus_cycle(
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                )
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"NBA Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"NBA Cycle #{cycle}: No trades this cycle")
+                # Run every 30 minutes
+                await asyncio.sleep(1800)
+            except Exception as e:
+                self.logger.error(f"Error in NBA trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_soccer_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for soccer consensus trading (runs every 60 min)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(75)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                # Soccer respects general night mode
+                if self._is_night_mode():
+                    self.logger.info("Night mode active — skipping soccer trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
+                cycle += 1
+                self.logger.info(f"Soccer: Starting Soccer Trading Cycle #{cycle}")
+                results = await run_soccer_consensus_cycle(
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                )
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"Soccer Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"Soccer Cycle #{cycle}: No trades this cycle")
+                # Run every 60 minutes
+                await asyncio.sleep(3600)
+            except Exception as e:
+                self.logger.error(f"Error in soccer trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
 
     async def run(self):
