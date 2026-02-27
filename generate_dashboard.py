@@ -30,76 +30,56 @@ KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
 
 def build_portfolio_timeline(fills, balance_now, portfolio_value_now):
     """
-    Reconstruct portfolio value curve from fill history.
+    Reconstruct total portfolio value (cash + unrealized positions) over time.
 
-    Strategy:
-    - Walk backwards from current cash balance through all fills to get cash at each point.
-    - The 'total portfolio' at each point = cash + position_value.
-    - Position value is estimated as: deposit - cash_at_t (money deployed into positions).
-      This is accurate because: total = cash + positions, and total starts at deposit.
-      As cash decreases, positions increase by the same amount (ignoring P&L noise).
-    - We then anchor the final point to the actual API values (balance_now + portfolio_value_now)
-      by applying a small linear correction to account for realized P&L over the period.
+    Formula: total(t) = deposit - cumulative_fees(t) + gross_pnl_interpolated(t)
+
+    Derivation:
+      cash(t) + positions(t) = deposit - fees(t) + realized_pnl(t) + unrealized_pnl(t)
+    Since we can't observe historical market prices, we interpolate the gross P&L
+    (= total_now - deposit + total_fees) linearly across time. This correctly anchors
+    the curve at deposit=$400 at the start and total_now at the end, with the fee
+    drag visible as a gradual downward pressure.
     """
     deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
     fills_sorted = sorted(fills, key=lambda x: x.get('ts', 0))
 
-    # Build cash delta per fill
-    deltas = []
-    for f in fills_sorted:
-        count = f.get('count', 0)
-        price = f.get('price', 0)
-        fee = float(f.get('fee_cost', 0))
-        action = f.get('action', '')
-        d = -(count * price + fee) if action == 'buy' else (count * price - fee)
-        deltas.append({'ts': f['ts'], 'delta': d})
+    total_fees_all = sum(float(f.get('fee_cost', 0)) for f in fills_sorted)
+    # Gross P&L before fees (what the positions earned/lost in aggregate)
+    gross_pnl = total_now - deposit + total_fees_all
 
-    # Walk backwards from current cash to get cash at each fill event
-    cash_series = []
-    cash = balance_now
-    cash_series.append({'ts': int(datetime.now(tz=timezone.utc).timestamp()), 'cash': cash})
-    for d in reversed(deltas):
-        cash -= d['delta']
-        cash_series.append({'ts': d['ts'], 'cash': round(cash, 2)})
-    cash_series = sorted(cash_series, key=lambda x: x['ts'])
-
-    # Clamp cash to [0, deposit] to handle any floating point drift
-    for pt in cash_series:
-        pt['cash'] = max(0.0, min(deposit, pt['cash']))
-
-    # Total portfolio at each point:
-    # total_t = deposit + cumulative_pnl_t
-    # We approximate cumulative P&L as linearly interpolated between 0 (at start) and
-    # (total_now - deposit) at the end. This gives a smooth, realistic curve.
-    total_pnl = total_now - deposit  # e.g. $0.52 gain or -$X loss
-    t_start = cash_series[0]['ts']
-    t_end = cash_series[-1]['ts']
+    t_start = fills_sorted[0]['ts']
+    t_end = int(datetime.now(tz=timezone.utc).timestamp())
     t_range = max(1, t_end - t_start)
 
+    cum_fees = 0.0
     timeline = []
-    for point in cash_series:
-        ts = point['ts']
-        cash_t = point['cash']
-        # Linear P&L interpolation
+
+    # Starting point: deposit, no fees yet
+    timeline.append({
+        'ts': t_start,
+        'label': datetime.fromtimestamp(t_start, tz=timezone.utc).strftime('%b %d %H:%M'),
+        'total': deposit,
+    })
+
+    for f in fills_sorted:
+        ts = f['ts']
+        cum_fees += float(f.get('fee_cost', 0))
         progress = (ts - t_start) / t_range
-        pnl_t = total_pnl * progress
-        total_t = round(deposit + pnl_t, 2)
-        # Ensure total never goes below cash (sanity check)
-        total_t = max(total_t, cash_t)
+        pnl_t = gross_pnl * progress
+        total_t = round(deposit - cum_fees + pnl_t, 2)
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        timeline.append({
-            'ts': ts,
-            'label': dt.strftime('%b %d %H:%M'),
-            'cash': cash_t,
-            'total': total_t,
-        })
+        timeline.append({'ts': ts, 'label': dt.strftime('%b %d %H:%M'), 'total': total_t})
 
-    # Force the last point to exactly match current API values
-    timeline[-1]['cash'] = round(balance_now, 2)
-    timeline[-1]['total'] = round(total_now, 2)
+    # Final point anchored exactly to current API total
+    timeline.append({
+        'ts': t_end,
+        'label': datetime.now(tz=timezone.utc).strftime('%b %d %H:%M'),
+        'total': round(total_now, 2),
+    })
 
-    # Deduplicate and downsample
+    # Deduplicate and downsample to ~300 points
     seen = {}
     for t in timeline:
         seen[t['ts']] = t
@@ -331,11 +311,8 @@ def generate_html(metrics, generated_at):
     # 9. Portfolio value over time
     ptl = metrics['portfolio_timeline']
     ptl_labels = [p['label'] for p in ptl]
-    ptl_cash = [p['cash'] for p in ptl]
     ptl_total = [p['total'] for p in ptl]
     deposit = round(metrics['deposit'], 2)
-    # P&L vs deposit
-    ptl_pnl = [round(p['total'] - deposit, 2) for p in ptl]
 
     # Summary stats
     net_pnl = metrics['total_realized_pnl']
@@ -441,12 +418,11 @@ def generate_html(metrics, generated_at):
   <div class="flex items-center justify-between mb-1">
     <div class="text-sm font-semibold text-white">📈 Portfolio Value Over Time</div>
     <div class="flex items-center gap-4 text-xs text-slate-400">
-      <span><span style="display:inline-block;width:12px;height:12px;background:rgba(34,197,94,0.25);border-radius:2px;vertical-align:middle;"></span> Available Cash</span>
-      <span><span style="display:inline-block;width:18px;height:3px;background:#ef4444;vertical-align:middle;"></span> Total Portfolio</span>
+      <span><span style="display:inline-block;width:18px;height:3px;background:#ef4444;vertical-align:middle;"></span> Total Portfolio (cash + unrealized)</span>
       <span><span style="display:inline-block;width:18px;height:2px;background:#94a3b8;border-top:2px dashed #94a3b8;vertical-align:middle;"></span> Deposited (${deposit:.0f})</span>
     </div>
   </div>
-  <div class="text-xs text-slate-500 mb-3">Reconstructed from {len(ptl)} fill events since {ptl_labels[0] if ptl_labels else 'N/A'}</div>
+  <div class="text-xs text-slate-500 mb-3">Reconstructed from {len(ptl)} fill events · {ptl_labels[0] if ptl_labels else 'N/A'} → now</div>
   <canvas id="portfolioChart" style="max-height:320px;"></canvas>
 </div>
 
@@ -723,11 +699,10 @@ new Chart(document.getElementById('hourlyChart'), {{
   }}
 }});
 
-// 6. Portfolio Value Over Time
+// 6. Portfolio Value Over Time — two lines only: total portfolio and deposit baseline
 const portfolioLabels = {json.dumps(ptl_labels)};
-const portfolioCash = {json.dumps(ptl_cash)};
 const portfolioTotal = {json.dumps(ptl_total)};
-const depositLine = {json.dumps([deposit] * len(ptl_labels))};
+const depositLine = new Array(portfolioLabels.length).fill({deposit});
 
 new Chart(document.getElementById('portfolioChart'), {{
   type: 'line',
@@ -735,25 +710,15 @@ new Chart(document.getElementById('portfolioChart'), {{
     labels: portfolioLabels,
     datasets: [
       {{
-        label: 'Available Cash',
-        data: portfolioCash,
-        fill: true,
-        backgroundColor: 'rgba(34, 197, 94, 0.15)',
-        borderColor: 'rgba(34, 197, 94, 0.5)',
-        borderWidth: 1.5,
-        pointRadius: 0,
-        tension: 0.3,
-        order: 2,
-      }},
-      {{
         label: 'Total Portfolio',
         data: portfolioTotal,
         fill: false,
         borderColor: '#ef4444',
+        backgroundColor: 'rgba(239,68,68,0.08)',
         borderWidth: 2.5,
         pointRadius: 0,
+        pointHoverRadius: 4,
         tension: 0.3,
-        order: 1,
       }},
       {{
         label: 'Deposited (${deposit:.0f})',
@@ -764,7 +729,6 @@ new Chart(document.getElementById('portfolioChart'), {{
         borderDash: [6, 4],
         pointRadius: 0,
         tension: 0,
-        order: 3,
       }}
     ]
   }},
@@ -772,7 +736,7 @@ new Chart(document.getElementById('portfolioChart'), {{
     responsive: true,
     interaction: {{ mode: 'index', intersect: false }},
     plugins: {{
-      legend: {{ labels: {{ color: '#94a3b8', font: {{ size: 11 }}, usePointStyle: true }} }},
+      legend: {{ labels: {{ color: '#94a3b8', font: {{ size: 11 }}, usePointStyle: true, boxWidth: 20 }} }},
       tooltip: {{
         backgroundColor: '#1e293b',
         titleColor: '#e2e8f0',
@@ -781,6 +745,14 @@ new Chart(document.getElementById('portfolioChart'), {{
         borderWidth: 1,
         callbacks: {{
           label: ctx => ` ${{ctx.dataset.label}}: $${{ctx.parsed.y.toFixed(2)}}`,
+          afterBody: (items) => {{
+            const total = items.find(i => i.dataset.label === 'Total Portfolio');
+            if (total) {{
+              const pnl = total.parsed.y - {deposit};
+              return [`  P&L vs deposit: ${{pnl >= 0 ? '+' : ''}}$${{pnl.toFixed(2)}}`];
+            }}
+            return [];
+          }}
         }}
       }}
     }},
@@ -790,7 +762,7 @@ new Chart(document.getElementById('portfolioChart'), {{
         grid: {{ color: '#1e293b' }}
       }},
       y: {{
-        ticks: {{ color: '#64748b', font: {{ size: 10 }}, callback: v => '$' + v.toLocaleString() }},
+        ticks: {{ color: '#64748b', font: {{ size: 10 }}, callback: v => '$' + v.toFixed(0) }},
         grid: {{ color: '#1e293b' }}
       }}
     }}
