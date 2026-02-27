@@ -1,0 +1,56 @@
+name: Publish Live Dashboard
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Write Kalshi private key
+        run: |
+          printf '%s' "${{ secrets.KALSHI_PRIVATE_KEY }}" > kalshi_private_key
+          chmod 600 kalshi_private_key
+
+      - name: Generate dashboard HTML
+        env:
+          KALSHI_API_KEY: ${{ secrets.KALSHI_API_KEY }}
+          KALSHI_PRIVATE_KEY_PATH: kalshi_private_key
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python3 generate_dashboard.py
+          mkdir -p docs
+          cp dashboard.html docs/index.html
+          echo "Last updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > docs/last_updated.txt
+
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html docs/last_updated.txt
+          git diff --staged --quiet || git commit -m "Auto-update dashboard $(date -u '+%Y-%m-%d %H:%M UTC') [skip ci]"
+          git push
