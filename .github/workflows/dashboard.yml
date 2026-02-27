@@ -30,14 +30,30 @@ jobs:
           pip install -r requirements.txt
 
       - name: Write Kalshi private key
+        env:
+          KALSHI_PK: ${{ secrets.KALSHI_PRIVATE_KEY }}
         run: |
-          printf '%s' "${{ secrets.KALSHI_PRIVATE_KEY }}" > kalshi_private_key
+          echo "$KALSHI_PK" > kalshi_private_key
           chmod 600 kalshi_private_key
+          echo "Key file size: $(wc -c < kalshi_private_key) bytes"
+          head -1 kalshi_private_key
+
+      - name: Create .env file
+        env:
+          KALSHI_API_KEY: ${{ secrets.KALSHI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          echo "KALSHI_API_KEY=${KALSHI_API_KEY}" > .env
+          echo "OPENAI_API_KEY=${OPENAI_API_KEY}" >> .env
+          echo "XAI_API_KEY=${XAI_API_KEY}" >> .env
+          echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" >> .env
+          echo ".env created with $(wc -l < .env) lines"
 
       - name: Generate dashboard HTML
         env:
           KALSHI_API_KEY: ${{ secrets.KALSHI_API_KEY }}
-          KALSHI_PRIVATE_KEY_PATH: kalshi_private_key
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
