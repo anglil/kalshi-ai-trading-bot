@@ -47,6 +47,7 @@ from src.strategies.econ_consensus import run_econ_consensus_cycle
 from src.strategies.flu_consensus import run_flu_consensus_cycle
 from src.strategies.nba_consensus import run_nba_consensus_cycle, _is_nba_game_hours
 from src.strategies.soccer_consensus import run_soccer_consensus_cycle
+from src.strategies.follow_the_leader import run_follow_the_leader_cycle
 from beast_mode_dashboard import BeastModeDashboard
 
 
@@ -170,6 +171,7 @@ class BeastModeBot:
                 asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_nba_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_soccer_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_follow_the_leader(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_trading_cycles(db_manager, kalshi_client, xai_client)),
                 asyncio.create_task(self._run_position_tracking(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_performance_evaluation(db_manager))
@@ -555,6 +557,37 @@ class BeastModeBot:
                 await asyncio.sleep(3600)
             except Exception as e:
                 self.logger.error(f"Error in soccer trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_follow_the_leader(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for Follow the Leader strategy (runs every 30 min, 24/7)."""
+        # Initial delay — let market ingestion settle
+        await asyncio.sleep(90)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                cycle += 1
+                self.logger.info(f"🎯 FTL: Starting Follow the Leader Cycle #{cycle}")
+                results = await run_follow_the_leader_cycle(
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                )
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"✅ FTL Cycle #{cycle} ({mode}): "
+                        f"{results['signals_generated']} signals, "
+                        f"{results['orders_placed']} orders placed, "
+                        f"${results['total_position_value']:.2f} deployed"
+                    )
+                else:
+                    self.logger.info(
+                        f"📊 FTL Cycle #{cycle}: "
+                        f"{results.get('signals_generated', 0)} signals, no trades this cycle"
+                    )
+                # Run every 30 minutes
+                await asyncio.sleep(1800)
+            except Exception as e:
+                self.logger.error(f"Error in Follow the Leader cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
 
     async def run(self):
