@@ -254,19 +254,45 @@ def _score_market(agg: MarketTradeAgg) -> Tuple[str, float]:
 async def _enrich_with_market_details(
     kalshi_client: KalshiClient,
     tickers: List[str],
+    db_manager: Optional['DatabaseManager'] = None,
 ) -> Dict[str, Dict]:
     """
     Fetch market details for a list of tickers.
+    Uses DB cache first, falls back to a single batch API call.
     Returns dict of ticker -> market dict.
     """
     details: Dict[str, Dict] = {}
-    for ticker in tickers:
+
+    # Try DB cache first (fast, no API calls)
+    if db_manager is not None:
         try:
-            result = await kalshi_client.get_market(ticker)
-            market = result.get('market', result)
-            details[ticker] = market
+            # get_eligible_markets returns Market objects; convert to dicts
+            db_markets = await db_manager.get_eligible_markets(volume_min=0, max_days_to_expiry=365)
+            tickers_set = set(tickers)
+            for m in db_markets:
+                t = getattr(m, 'market_id', None) or (m.get('ticker') if isinstance(m, dict) else None)
+                if t and t in tickers_set:
+                    details[t] = m.__dict__ if hasattr(m, '__dict__') else m
         except Exception as e:
-            logger.debug(f"FTL: could not fetch market {ticker}: {e}")
+            logger.debug(f"FTL: DB market cache lookup failed: {e}")
+
+    # For any tickers not in DB, fetch via a single batch API call (no status filter = all active)
+    missing = [t for t in tickers if t not in details]
+    if missing:
+        try:
+            result = await kalshi_client._make_authenticated_request(
+                'GET',
+                '/trade-api/v2/markets',
+                params={'limit': 200},
+            )
+            for m in result.get('markets', []):
+                t = m.get('ticker', '')
+                if t in missing:
+                    details[t] = m
+        except Exception as e:
+            logger.debug(f"FTL: batch market fetch failed: {e}")
+
+    logger.debug(f"FTL: enriched {len(details)}/{len(tickers)} markets")
     return details
 
 
@@ -277,6 +303,7 @@ async def _enrich_with_market_details(
 async def _generate_leader_signals(
     kalshi_client: KalshiClient,
     lookback_minutes: int = LOOKBACK_MINUTES,
+    db_manager: Optional['DatabaseManager'] = None,
 ) -> List[LeaderSignal]:
     """
     Scan the public trades feed and generate Follow the Leader signals.
@@ -312,10 +339,9 @@ async def _generate_leader_signals(
         logger.info("FTL: no markets met the minimum leader score threshold")
         return []
 
-    # Enrich with market details
+    # Enrich with market detai    # Enrich with market details (uses DB cache, much faster)
     tickers_to_enrich = [t[0] for t in top_scored]
-    details = await _enrich_with_market_details(kalshi_client, tickers_to_enrich)
-
+    details = await _enrich_with_market_details(kalshi_client, tickers_to_enrich, db_manager=db_manager)
     signals: List[LeaderSignal] = []
     for ticker, side, score, a in top_scored:
         market = details.get(ticker)
@@ -564,7 +590,7 @@ async def run_follow_the_leader_cycle(
             return results
 
     # Generate signals
-    signals = await _generate_leader_signals(kalshi_client, LOOKBACK_MINUTES)
+    signals = await _generate_leader_signals(kalshi_client, LOOKBACK_MINUTES, db_manager=db_manager)
     results["signals_generated"] = len(signals)
 
     if not signals:
