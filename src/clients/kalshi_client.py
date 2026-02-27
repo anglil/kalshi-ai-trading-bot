@@ -68,17 +68,26 @@ class KalshiClient(TradingLoggerMixin):
         self.logger.info("Kalshi client initialized", api_key_length=len(self.api_key) if self.api_key else 0)
     
     def _load_private_key(self) -> None:
-        """Load private key from file."""
+        """Load private key from file or env var."""
+        import os
         try:
-            private_key_path = Path(self.private_key_path)
+            # Allow env var override for the path
+            key_path = os.environ.get('KALSHI_PRIVATE_KEY_PATH', self.private_key_path)
+            private_key_path = Path(key_path)
             if not private_key_path.exists():
-                raise KalshiAPIError(f"Private key file not found: {self.private_key_path}")
+                raise KalshiAPIError(f"Private key file not found: {key_path}")
             
-            with open(private_key_path, 'rb') as f:
-                self.private_key = serialization.load_pem_private_key(
-                    f.read(),
-                    password=None
-                )
+            raw = private_key_path.read_bytes()
+
+            # If the file does not start with a PEM header, assume base64
+            if not raw.strip().startswith(b'-----'):
+                import base64
+                raw = base64.b64decode(raw)
+
+            self.private_key = serialization.load_pem_private_key(
+                raw,
+                password=None
+            )
             self.logger.info("Private key loaded successfully")
         except Exception as e:
             self.logger.error("Failed to load private key", error=str(e))

@@ -184,10 +184,8 @@ async def place_profit_taking_orders(
             try:
                 results['positions_processed'] += 1
 
-                # Skip weather positions — they hold to settlement
+                # All positions (including weather) are now eligible for profit-taking
                 strategy = getattr(position, 'strategy', '') or ''
-                if strategy.startswith('weather'):
-                    continue
 
                 # Get current market data
                 market_response = await kalshi_client.get_market(position.market_id)
@@ -210,12 +208,17 @@ async def place_profit_taking_orders(
                     
                     logger.debug(f"Position {position.market_id}: Entry=${position.entry_price:.3f}, Current=${current_price:.3f}, Profit={profit_pct:.1%}, PnL=${unrealized_pnl:.2f}")
                     
+                    # Use different thresholds for weather vs other strategies
+                    effective_threshold = profit_threshold
+                    if strategy.startswith('weather'):
+                        effective_threshold = 0.50  # 50% profit target for weather (higher bar)
+                    
                     # Check if we should place a profit-taking sell order
-                    if profit_pct >= profit_threshold:
+                    if profit_pct >= effective_threshold:
                         # Calculate sell limit price (slightly below current to ensure execution)
                         sell_price = current_price * 0.98  # 2% below current price for quick execution
                         
-                        logger.info(f"💰 PROFIT TARGET HIT: {position.market_id} - {profit_pct:.1%} profit (${unrealized_pnl:.2f})")
+                        logger.info(f"💰 PROFIT TARGET HIT: {position.market_id} [{strategy}] - {profit_pct:.1%} profit (${unrealized_pnl:.2f})")
                         
                         # Place sell limit order
                         success = await place_sell_limit_order(
@@ -277,10 +280,8 @@ async def place_stop_loss_orders(
             try:
                 results['positions_processed'] += 1
 
-                # Skip weather positions — they hold to settlement
+                # All positions (including weather) are now eligible for stop-loss
                 strategy = getattr(position, 'strategy', '') or ''
-                if strategy.startswith('weather'):
-                    continue
 
                 # Get current market data
                 market_response = await kalshi_client.get_market(position.market_id)
@@ -301,13 +302,17 @@ async def place_stop_loss_orders(
                     loss_pct = (current_price - position.entry_price) / position.entry_price
                     unrealized_pnl = (current_price - position.entry_price) * position.quantity
                     
+                    # Use different stop-loss thresholds for weather vs other strategies
+                    effective_threshold = stop_loss_threshold
+                    if strategy.startswith('weather'):
+                        effective_threshold = -0.50  # 50% stop-loss for weather (wider due to binary nature)
+                    
                     # Check if we need stop-loss protection
-                    if loss_pct <= stop_loss_threshold:  # Negative loss percentage
-                        # Calculate stop-loss sell price
-                        stop_price = position.entry_price * (1 + stop_loss_threshold * 1.1)  # Slightly more aggressive
-                        stop_price = max(0.01, stop_price)  # Ensure price is at least 1¢
+                    if loss_pct <= effective_threshold:  # Negative loss percentage
+                        # Calculate stop-loss sell price — sell at current market price
+                        stop_price = max(0.01, current_price * 0.95)  # 5% below current for quick fill
                         
-                        logger.info(f"🛡️ STOP LOSS TRIGGERED: {position.market_id} - {loss_pct:.1%} loss (${unrealized_pnl:.2f})")
+                        logger.info(f"🛡️ STOP LOSS TRIGGERED: {position.market_id} [{strategy}] - {loss_pct:.1%} loss (${unrealized_pnl:.2f})")
                         
                         # Place stop-loss sell order
                         success = await place_sell_limit_order(

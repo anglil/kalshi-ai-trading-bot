@@ -404,8 +404,8 @@ class BeastModeBot:
                     )
                 else:
                     self.logger.info(f"📊 Weather Cycle #{cycle}: No trades this cycle")
-                # Run every 30 minutes
-                await asyncio.sleep(1800)
+                # Run every 60 minutes (slowed from 30 min to reduce weather dominance)
+                await asyncio.sleep(3600)
             except Exception as e:
                 self.logger.error(f"Error in weather trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
@@ -462,8 +462,8 @@ class BeastModeBot:
                     )
                 else:
                     self.logger.info(f"📊 Econ Cycle #{cycle}: No trades this cycle")
-                # Run every 4 hours
-                await asyncio.sleep(14400)
+                # Run every 2 hours (increased frequency for diversification)
+                await asyncio.sleep(7200)
             except Exception as e:
                 self.logger.error(f"Error in econ trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
@@ -584,8 +584,8 @@ class BeastModeBot:
                         f"📊 FTL Cycle #{cycle}: "
                         f"{results.get('signals_generated', 0)} signals, no trades this cycle"
                     )
-                # Run every 30 minutes
-                await asyncio.sleep(1800)
+                # Run every 20 minutes (increased frequency for diversification)
+                await asyncio.sleep(1200)
             except Exception as e:
                 self.logger.error(f"Error in Follow the Leader cycle #{cycle}: {e}")
                 await asyncio.sleep(300)

@@ -289,10 +289,11 @@ def generate_weather_signals(
     bracket_probs: Dict[str, float],
     city: str,
     bankroll: float,
-    min_edge: float = 0.08,
-    max_position_pct: float = 0.05,
-    kelly_fraction: float = 0.5,
+    min_edge: float = 0.15,
+    max_position_pct: float = 0.03,
+    kelly_fraction: float = 0.25,
     rationale_prefix: str = "WEATHER",
+    max_shares: int = 5,
 ) -> List[WeatherTradeSignal]:
     """
     Generate trade signals by comparing our probability estimates
@@ -323,6 +324,11 @@ def generate_weather_signals(
         # Calculate edge in both directions
         yes_edge = our_prob - market_prob      # Edge for buying YES
         no_edge = market_prob - our_prob        # Edge for buying NO
+        
+        # Priority 5: Market efficiency check — if market price is within 5% of our
+        # fair value, the market is already efficient and we have no real edge
+        if abs(yes_edge) < 0.05 and abs(no_edge) < 0.05:
+            continue
         
         # Determine best side
         if yes_edge >= min_edge:
@@ -361,7 +367,7 @@ def generate_weather_signals(
         fee = kalshi_taker_fee(entry_price_cents)
         net_edge = edge - fee
         
-        if net_edge < 0.03:  # Skip if edge doesn't cover fees + 3% margin
+        if net_edge < 0.05:  # Skip if edge doesn't cover fees + 5% margin (raised from 3%)
             continue
         
         # Minimum position: at least 1 contract
@@ -370,17 +376,17 @@ def generate_weather_signals(
             continue
         
         shares = max(1, int(position_size / entry_price_dollars))
-        shares = min(shares, 10)  # cap to prevent penny bet accumulation
+        shares = min(shares, max_shares)  # cap to prevent penny bet accumulation
         actual_position = shares * entry_price_dollars
         
-        # Set limit price: our fair value minus some margin for fill
+        # Set limit price: use maker-friendly pricing (2¢ below ask to be maker)
         if side == "YES":
             # We want to buy YES at a good price (below fair value)
-            limit_price = min(entry_price_cents, int(our_prob * 100) - 1)
+            limit_price = min(entry_price_cents - 2, int(our_prob * 100) - 2)
             limit_price = max(1, limit_price)
         else:
             # We want to buy NO at a good price
-            limit_price = min(entry_price_cents, int((1 - our_prob) * 100) - 1)
+            limit_price = min(entry_price_cents - 2, int((1 - our_prob) * 100) - 2)
             limit_price = max(1, limit_price)
         
         # Build bracket description
@@ -472,7 +478,7 @@ async def execute_weather_trade(
         if order_response and "order" in order_response:
             order_id = order_response["order"].get("order_id", client_order_id)
             
-            # Weather positions: 30% adverse move stop-loss, 50% gain take-profit
+            # Weather positions: 50% adverse move stop-loss, 80% gain take-profit
             entry_dollars = signal.limit_price / 100.0
             position = Position(
                 market_id=signal.bracket.ticker,
@@ -483,9 +489,9 @@ async def execute_weather_trade(
                 timestamp=datetime.now(),
                 rationale=signal.rationale,
                 strategy=strategy,
-                stop_loss_price=max(0.02, round(entry_dollars * 0.70, 2)),
-                take_profit_price=min(0.95, round(entry_dollars * 1.50, 2)),
-                max_hold_hours=48,  # weather markets settle within 24-48h
+                stop_loss_price=max(0.02, round(entry_dollars * 0.50, 2)),
+                take_profit_price=min(0.95, round(entry_dollars * 1.80, 2)),
+                max_hold_hours=36,  # weather markets settle within 24h
             )
             await db_manager.add_position(position)
             
@@ -539,12 +545,13 @@ async def run_weather_trading_cycle(
         logger.error(f"Could not fetch balance: {e}")
         return results
     
-    # Use full available balance — no new deposits, trade only with what's in the account
-    weather_bankroll = bankroll
+    # Priority 3: Cap weather exposure at 30% of total portfolio
+    weather_bankroll = bankroll * 0.30
     
     if weather_bankroll < 5.0:
-        logger.warning(f"⚠️ Insufficient weather bankroll: ${weather_bankroll:.2f}")
+        logger.warning(f"⚠️ Insufficient weather bankroll: ${weather_bankroll:.2f} (30% of ${bankroll:.2f})")
         return results
+    logger.info(f"Weather bankroll: ${weather_bankroll:.2f} (30% cap of ${bankroll:.2f})")
     
     # Target dates: today and tomorrow
     today = datetime.now().strftime("%Y-%m-%d")
@@ -615,9 +622,10 @@ async def run_weather_trading_cycle(
                 bracket_probs=bracket_probs,
                 city=station.city,
                 bankroll=weather_bankroll,
-                min_edge=0.08,          # 8% minimum edge
-                max_position_pct=0.05,  # 5% per bracket
-                kelly_fraction=0.5,     # Half Kelly
+                min_edge=0.15,          # 15% minimum edge (raised from 8%)
+                max_position_pct=0.03,  # 3% per bracket (reduced from 5%)
+                kelly_fraction=0.25,    # Quarter Kelly (reduced from 0.5)
+                max_shares=5,           # Cap shares per trade
             )
             
             if city_signals:
@@ -642,7 +650,7 @@ async def run_weather_trading_cycle(
     
     # Sort all signals by edge and take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 5  # Max trades per cycle
+    max_trades = 3  # Max trades per cycle (reduced from 5)
     
     logger.info(f"🌡️ Top weather signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):

@@ -38,8 +38,13 @@ logger = get_trading_logger("weather_consensus")
 # Risk management constants
 # ============================================================
 
-MAX_POSITIONS_PER_CITY = 3       # Max concurrent positions per city
-BRACKET_OVERLAP_THRESHOLD = 5    # °F — brackets within this range are "overlapping"
+MAX_POSITIONS_PER_CITY = 2       # Max concurrent positions per city (reduced from 3)
+BRACKET_OVERLAP_THRESHOLD = 4    # °F — brackets within this range are "overlapping"
+MAX_DAILY_LOSSES_PER_CITY = 2    # Stop trading a city after this many consecutive losses in a day
+MIN_EDGE_THRESHOLD = 0.15        # 15% minimum edge (raised from 8%)
+KELLY_FRACTION = 0.25            # Quarter-Kelly (reduced from 0.5)
+MAX_POSITION_PCT = 0.03          # 3% per bracket (reduced from 5%)
+MAX_SHARES_PER_TRADE = 5         # Cap shares per trade (reduced from 10)
 
 
 # ============================================================
@@ -149,14 +154,15 @@ def compute_consensus(forecast: MultiSourceForecast) -> ConsensusResult:
     agreement_ratio = len(best_cluster) / n
 
     # Map ratio to sigma and confidence label
+    # Priority 5: Calibrate sigma upward — our forecast is less precise than we thought
     if agreement_ratio >= 0.80:
-        sigma = 1.5
+        sigma = 2.5   # Was 1.5 — too tight, caused overconfident bets
         confidence = "high"
     elif agreement_ratio >= 0.60:
-        sigma = 2.5
+        sigma = 3.5   # Was 2.5
         confidence = "medium"
     else:
-        sigma = 4.0
+        sigma = 5.0   # Was 4.0
         confidence = "low"
 
     # Time-of-day adjustment: forecasts are less certain early in the morning
@@ -210,11 +216,11 @@ async def _nws_fallback_for_city(
 
     hour = datetime.now().hour
     if hour >= 10:
-        sigma = 2.0
+        sigma = 3.0   # Was 2.0 — calibrated upward
     elif hour >= 6:
-        sigma = 2.5
+        sigma = 3.5   # Was 2.5
     else:
-        sigma = 3.5
+        sigma = 4.5   # Was 3.5
 
     bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
     return generate_weather_signals(
@@ -222,10 +228,11 @@ async def _nws_fallback_for_city(
         bracket_probs=bracket_probs,
         city=station.city,
         bankroll=weather_bankroll,
-        min_edge=0.08,
-        max_position_pct=0.05,
-        kelly_fraction=0.5,
+        min_edge=MIN_EDGE_THRESHOLD,
+        max_position_pct=MAX_POSITION_PCT,
+        kelly_fraction=KELLY_FRACTION,
         rationale_prefix="WEATHER-NWS",
+        max_shares=MAX_SHARES_PER_TRADE,
     )
 
 
@@ -269,11 +276,14 @@ async def run_consensus_weather_cycle(
         logger.error(f"Could not fetch portfolio value: {e}")
         return results
 
-    # Use full portfolio value for bankroll — position sizing uses max_position_pct to limit risk
-    weather_bankroll = bankroll
+    # Priority 3: Cap weather exposure at 30% of total portfolio
+    WEATHER_EXPOSURE_CAP = 0.30  # Max 30% of portfolio for weather
+    DAILY_DEPLOYMENT_LIMIT = 50.0  # Max $50/day in new weather buys
+    weather_bankroll = bankroll * WEATHER_EXPOSURE_CAP
     if weather_bankroll < 5.0:
-        logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f}")
+        logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f} (30% of ${bankroll:.2f})")
         return results
+    logger.info(f"WEATHER BANKROLL: ${weather_bankroll:.2f} (30% cap of ${bankroll:.2f} portfolio)")
 
     today = datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -324,16 +334,17 @@ async def run_consensus_weather_cycle(
                 consensus.consensus_temp, brackets, sigma=consensus.sigma,
             )
 
-            # 6. Generate signals
+            # 6. Generate signals (using tightened risk parameters)
             city_signals = generate_weather_signals(
                 brackets=brackets,
                 bracket_probs=bracket_probs,
                 city=station.city,
                 bankroll=weather_bankroll,
-                min_edge=0.08,
-                max_position_pct=0.05,
-                kelly_fraction=0.5,
+                min_edge=MIN_EDGE_THRESHOLD,
+                max_position_pct=MAX_POSITION_PCT,
+                kelly_fraction=KELLY_FRACTION,
                 rationale_prefix=f"CONSENSUS({consensus.confidence})",
+                max_shares=MAX_SHARES_PER_TRADE,
             )
 
             if city_signals:
@@ -357,7 +368,7 @@ async def run_consensus_weather_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 5
+    max_trades = 3  # Reduced from 5 to limit daily deployment
 
     # Filter out signals for tickers where we already hold a position
     held_tickers = set()
