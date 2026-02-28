@@ -68,30 +68,51 @@ class KalshiClient(TradingLoggerMixin):
         self.logger.info("Kalshi client initialized", api_key_length=len(self.api_key) if self.api_key else 0)
     
     def _load_private_key(self) -> None:
-        """Load private key from file or env var."""
+        """Load private key from file, env var, or committed .b64 fallback."""
         import os
-        try:
-            # Allow env var override for the path
-            key_path = os.environ.get('KALSHI_PRIVATE_KEY_PATH', self.private_key_path)
-            private_key_path = Path(key_path)
-            if not private_key_path.exists():
-                raise KalshiAPIError(f"Private key file not found: {key_path}")
-            
-            raw = private_key_path.read_bytes()
+        import base64
 
-            # If the file does not start with a PEM header, assume base64
-            if not raw.strip().startswith(b'-----'):
-                import base64
-                raw = base64.b64decode(raw)
+        # Build ordered list of key sources to try
+        key_sources = []
 
-            self.private_key = serialization.load_pem_private_key(
-                raw,
-                password=None
-            )
-            self.logger.info("Private key loaded successfully")
-        except Exception as e:
-            self.logger.error("Failed to load private key", error=str(e))
-            raise KalshiAPIError(f"Failed to load private key: {e}")
+        # 1. Env-var / constructor path
+        primary = os.environ.get('KALSHI_PRIVATE_KEY_PATH', self.private_key_path)
+        key_sources.append(('primary', Path(primary)))
+
+        # 2. Committed base64 file (works in GitHub Actions even if secret is wrong)
+        b64_fallback = Path(primary).parent / 'kalshi_private_key.b64'
+        key_sources.append(('b64_fallback', b64_fallback))
+
+        # 3. Also check repo root if running from a subdirectory
+        repo_root_b64 = Path('kalshi_private_key.b64')
+        if repo_root_b64.resolve() != b64_fallback.resolve():
+            key_sources.append(('repo_root_b64', repo_root_b64))
+
+        last_error = None
+        for source_name, key_path in key_sources:
+            if not key_path.exists():
+                continue
+            try:
+                raw = key_path.read_bytes()
+
+                # If the file does not start with a PEM header, assume base64
+                if not raw.strip().startswith(b'-----'):
+                    raw = base64.b64decode(raw)
+
+                self.private_key = serialization.load_pem_private_key(
+                    raw,
+                    password=None
+                )
+                self.logger.info("Private key loaded successfully", source=source_name)
+                return
+            except Exception as e:
+                last_error = e
+                self.logger.warning(f"Key source '{source_name}' failed: {e}")
+                continue
+
+        msg = f"All key sources exhausted. Last error: {last_error}"
+        self.logger.error(msg)
+        raise KalshiAPIError(f"Failed to load private key: {msg}")
     
     def _sign_request(self, timestamp: str, method: str, path: str) -> str:
         """
