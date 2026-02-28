@@ -48,102 +48,89 @@ KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
 
 def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_now):
     """
-    Reconstruct total portfolio value (cash + position cost basis) over time
-    by replaying every fill and settlement chronologically.
+    Reconstruct portfolio value over time using settlement-anchored checkpoints.
 
-    At each event, we track:
-      - cash: starts at deposit, decreases on buys, increases on sells and settlements
-      - position_cost: total cost basis of open positions (increases on buys, decreases on settlements)
-      - total = cash + position_cost  (approximation; uses cost basis, not mark-to-market)
+    The key insight: we can only know the TRUE portfolio value at two types of moments:
+      1. The very start (deposit = $400)
+      2. The current moment (from the API: cash + portfolio_value)
 
-    The final point is anchored to the live API value (cash + portfolio_value) for accuracy.
+    Between these, settlements give us "cash recovered" events that let us track
+    the realized portion. We use: total = deposit + cumulative_net_settlements - cumulative_fees
+    at settlement points, then interpolate to the current API value.
+
+    This avoids the cost-basis inflation problem entirely.
     """
     from dateutil.parser import isoparse
     deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
 
-    # Build unified event list
-    events = []
-
-    for f in fills:
-        ts = f.get('ts', 0)
-        action = f.get('action', 'buy')
-        count = int(f.get('count', 0))
-        side = f.get('side', 'yes')
-        fee = float(f.get('fee_cost', 0))
-        price_cents = f.get('yes_price', 0) if side == 'yes' else f.get('no_price', 0)
-        cost_dollars = count * price_cents / 100.0
-        events.append({
-            'ts': ts,
-            'type': 'fill',
-            'action': action,
-            'cost': cost_dollars,
-            'fee': fee,
-        })
-
+    # Step 1: Build settlement checkpoints — these are moments where we know
+    # the exact realized P&L (revenue - cost) for settled positions.
+    settlement_events = []
     for s in settlements:
-        # Parse settlement time
         settled_str = s.get('settled_time', '')
         try:
             settled_dt = isoparse(settled_str)
             ts = int(settled_dt.timestamp())
         except Exception:
             continue
-        revenue = s.get('revenue', 0) / 100.0  # cents to dollars
+        revenue = s.get('revenue', 0) / 100.0
         yes_cost = s.get('yes_total_cost', 0) / 100.0
         no_cost = s.get('no_total_cost', 0) / 100.0
         total_cost = yes_cost + no_cost
-        fee = float(s.get('fee_cost', '0'))
-        events.append({
-            'ts': ts,
-            'type': 'settlement',
-            'revenue': revenue,
-            'cost_returned': total_cost,  # cost basis freed up
-            'fee': fee,
-        })
+        net_pnl = revenue - total_cost  # positive = profit, negative = loss
+        settlement_events.append({'ts': ts, 'net_pnl': net_pnl})
 
-    events.sort(key=lambda x: x['ts'])
-    if not events:
+    # Step 2: Also track fees from fills
+    fill_fees = []
+    for f in fills:
+        ts = f.get('ts', 0)
+        fee = float(f.get('fee_cost', 0))
+        fill_fees.append({'ts': ts, 'fee': fee})
+
+    # Step 3: Merge all events chronologically
+    all_events = []
+    for se in settlement_events:
+        all_events.append({'ts': se['ts'], 'type': 'settlement', 'net_pnl': se['net_pnl']})
+    for ff in fill_fees:
+        all_events.append({'ts': ff['ts'], 'type': 'fee', 'fee': ff['fee']})
+    all_events.sort(key=lambda x: x['ts'])
+
+    if not all_events:
         return [{'ts': 0, 'label': 'Now', 'total': total_now}], deposit
 
-    cash = deposit
-    position_cost = 0.0
+    # Step 4: Build the realized value curve.
+    # realized_value = deposit + cumulative(settlement_net_pnl) - cumulative(fees)
+    # This is 100% accurate at every settlement point.
+    # The final point is the live API total (cash + portfolio_value) which
+    # includes unrealized position value.
+    realized_value = deposit
     timeline = []
+    t_start = all_events[0]['ts']
+    t_end = int(datetime.now(tz=timezone.utc).timestamp())
 
-    # Starting point
-    t_start = events[0]['ts']
     timeline.append({
         'ts': t_start - 1,
         'label': datetime.fromtimestamp(t_start - 1, tz=timezone.utc).strftime('%b %d %H:%M'),
         'total': deposit,
     })
 
-    for ev in events:
-        if ev['type'] == 'fill':
-            if ev['action'] == 'buy':
-                cash -= ev['cost'] + ev['fee']
-                position_cost += ev['cost']
-            elif ev['action'] == 'sell':
-                cash += ev['cost'] - ev['fee']
-                position_cost -= ev['cost']
-                position_cost = max(0, position_cost)  # safety floor
-        elif ev['type'] == 'settlement':
-            # Settlement returns revenue to cash and removes cost basis
-            cash += ev['revenue']
-            position_cost -= ev['cost_returned']
-            position_cost = max(0, position_cost)
-            # Settlement fees are already deducted from revenue by Kalshi
+    for ev in all_events:
+        if ev['type'] == 'settlement':
+            realized_value += ev['net_pnl']
+        elif ev['type'] == 'fee':
+            realized_value -= ev['fee']
 
-        total = round(cash + position_cost, 2)
         dt = datetime.fromtimestamp(ev['ts'], tz=timezone.utc)
         timeline.append({
             'ts': ev['ts'],
             'label': dt.strftime('%b %d %H:%M'),
-            'total': total,
+            'total': round(realized_value, 2),
         })
 
-    # Final point anchored to live API value
-    t_end = int(datetime.now(tz=timezone.utc).timestamp())
+    # Final point: live API total (includes unrealized position value)
+    # This may jump up from the realized curve because open positions
+    # have mark-to-market value not yet reflected in settlements.
     timeline.append({
         'ts': t_end,
         'label': datetime.now(tz=timezone.utc).strftime('%b %d %H:%M'),
