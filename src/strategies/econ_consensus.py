@@ -350,10 +350,21 @@ async def run_econ_consensus_cycle(
     6. Execute trades (paper or live)
     """
     strategy_tag = "econ_consensus"
-    # FORCE LIVE: Econ is the only profitable strategy (+$18.80 on $20.30 deployed = 93% return)
-    # Override paper_mode to always trade live
-    paper_mode = False
-    logger.info(f"ECON CONSENSUS: Starting cycle (FORCED LIVE)...")
+    logger.info(f"ECON CONSENSUS: Starting cycle (paper={paper_mode})...")
+
+    # EMERGENCY PAUSE: The Gaussian model produces completely wrong probabilities
+    # for econ brackets because brackets overlap (e.g., "CPI >= 0%" overlaps with
+    # "CPI 2.5%-3.0%"). After normalization, P(CPI >= 0%) becomes 1% instead of ~100%.
+    # This causes the bot to bet that CPI will go NEGATIVE, which hasn't happened since 2009.
+    ECON_TRADING_PAUSED = True
+    if ECON_TRADING_PAUSED:
+        logger.warning("ECON PAUSED: Econ trading paused due to bracket overlap bug in Gaussian model. "
+                       "Set ECON_TRADING_PAUSED=False to resume.")
+        results: Dict = {
+            "indicators_analyzed": 0, "brackets_found": 0, "signals_generated": 0,
+            "orders_placed": 0, "total_position_value": 0.0, "paper_mode": paper_mode,
+        }
+        return results
 
     results: Dict = {
         "indicators_analyzed": 0,
