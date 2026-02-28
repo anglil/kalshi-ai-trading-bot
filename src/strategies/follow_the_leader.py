@@ -491,6 +491,28 @@ async def _execute_leader_trade(
             )
             return True
 
+        # === PRE-TRADE SAFETY CHECKS (via Kalshi API) ===
+        from src.jobs.execute import _check_existing_kalshi_position, MAX_CONTRACTS_PER_MARKET
+        try:
+            existing = await _check_existing_kalshi_position(kalshi_client, signal.ticker)
+            existing_pos = existing.get('position', 0)
+            existing_qty = abs(existing_pos)
+            existing_side = 'YES' if existing_pos > 0 else 'NO' if existing_pos < 0 else None
+            
+            if existing_side and existing_side != signal.side.upper():
+                logger.info(f"FTL: BLOCKED contradictory position on {signal.ticker}")
+                return False
+            if existing_qty >= MAX_CONTRACTS_PER_MARKET:
+                logger.info(f"FTL: BLOCKED position limit on {signal.ticker} ({existing_qty} held)")
+                return False
+            allowed = MAX_CONTRACTS_PER_MARKET - existing_qty
+            if shares > allowed:
+                shares = allowed
+                if shares <= 0:
+                    return False
+        except Exception as e:
+            logger.warning(f"FTL: pre-trade check failed: {e}")
+
         # Live order
         client_order_id = str(uuid.uuid4())
         side_lower = signal.side.lower()

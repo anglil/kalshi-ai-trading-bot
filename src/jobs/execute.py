@@ -13,6 +13,26 @@ from src.config.settings import settings
 from src.utils.logging_setup import get_trading_logger
 from src.clients.kalshi_client import KalshiClient, KalshiAPIError
 
+# Maximum contracts allowed per single market ticker
+MAX_CONTRACTS_PER_MARKET = 30
+
+async def _check_existing_kalshi_position(kalshi_client: KalshiClient, ticker: str) -> dict:
+    """
+    Check existing position on Kalshi for a given ticker.
+    Returns dict with 'position' (signed int, + for YES, - for NO) and 'market_exposure'.
+    """
+    try:
+        resp = await kalshi_client._make_authenticated_request(
+            'GET', '/trade-api/v2/portfolio/positions',
+            params={'ticker': ticker}
+        )
+        for mp in resp.get('market_positions', []):
+            if mp.get('ticker') == ticker:
+                return mp
+    except Exception:
+        pass
+    return {'position': 0, 'market_exposure': 0}
+
 async def execute_position(
     position: Position, 
     live_mode: bool, 
@@ -20,14 +40,13 @@ async def execute_position(
     kalshi_client: KalshiClient
 ) -> bool:
     """
-    Executes a single trade position.
+    Executes a single trade position with pre-trade safety checks.
     
-    Args:
-        position: The position to execute.
-        live_mode: Whether to execute a live or simulated trade.
-        db_manager: The database manager instance.
-        kalshi_client: The Kalshi client instance.
-        
+    Checks:
+    1. Contradictory position detection (don't buy YES if we hold NO, and vice versa)
+    2. Position size limits (don't exceed MAX_CONTRACTS_PER_MARKET)
+    3. Atomic order+DB tracking
+    
     Returns:
         True if execution was successful, False otherwise.
     """
@@ -35,13 +54,48 @@ async def execute_position(
     logger.info(f"Executing position for market: {position.market_id}")
 
     if live_mode:
+        # === PRE-TRADE SAFETY CHECKS ===
+        try:
+            existing = await _check_existing_kalshi_position(kalshi_client, position.market_id)
+            existing_pos = existing.get('position', 0)  # + = YES, - = NO
+            existing_qty = abs(existing_pos)
+            existing_side = 'YES' if existing_pos > 0 else 'NO' if existing_pos < 0 else None
+            
+            # Check 1: Contradictory position
+            if existing_side and existing_side != position.side.upper():
+                logger.error(
+                    f"BLOCKED: Contradictory position! Trying to buy {position.side} "
+                    f"but already hold {existing_qty} {existing_side} on {position.market_id}"
+                )
+                return False
+            
+            # Check 2: Position size limit
+            if existing_qty + position.quantity > MAX_CONTRACTS_PER_MARKET:
+                allowed = max(0, MAX_CONTRACTS_PER_MARKET - existing_qty)
+                if allowed == 0:
+                    logger.error(
+                        f"BLOCKED: Position limit reached! Already hold {existing_qty} "
+                        f"contracts on {position.market_id} (max {MAX_CONTRACTS_PER_MARKET})"
+                    )
+                    return False
+                else:
+                    logger.warning(
+                        f"REDUCED: Cutting order from {position.quantity} to {allowed} "
+                        f"contracts on {position.market_id} (already hold {existing_qty})"
+                    )
+                    position.quantity = allowed
+        except Exception as e:
+            logger.warning(f"Pre-trade check failed (proceeding cautiously): {e}")
         try:
             client_order_id = str(uuid.uuid4())
             
-            # Kalshi API requires a price even for "market" orders.
-            # Use limit order at 99¢ (YES) or 99¢ (NO) to simulate market order
-            # with maximum willingness to pay.
+            # Use limit order at entry_price to avoid paying max spread.
+            # The entry_price was calculated by the strategy as the fair value.
+            # Adding a small buffer (2c) to improve fill probability while
+            # still acting as a maker order when possible.
             side_lower = position.side.lower()
+            limit_price_cents = min(95, max(2, int(position.entry_price * 100) + 2))
+            
             order_kwargs = {
                 "ticker": position.market_id,
                 "client_order_id": client_order_id,
@@ -52,9 +106,11 @@ async def execute_position(
             }
             # Provide the correct price param based on side
             if side_lower == "yes":
-                order_kwargs["yes_price"] = 99  # 99 cents = effectively market order
+                order_kwargs["yes_price"] = limit_price_cents
             else:
-                order_kwargs["no_price"] = 99   # 99 cents = effectively market order
+                order_kwargs["no_price"] = limit_price_cents
+            
+            logger.info(f"Placing limit order: {position.quantity} {side_lower.upper()} @ {limit_price_cents}c on {position.market_id}")
             
             order_response = await kalshi_client.place_order(**order_kwargs)
             
@@ -201,10 +257,15 @@ async def place_profit_taking_orders(
                 else:
                     current_price = market_data.get('no_price', 0) / 100
                 
-                # Calculate current profit
+                # Calculate current profit — side-aware
                 if current_price > 0:
-                    profit_pct = (current_price - position.entry_price) / position.entry_price
-                    unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                    if position.side.upper() == 'YES':
+                        profit_pct = (current_price - position.entry_price) / position.entry_price
+                        unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                    else:
+                        # For NO positions: profit when price drops
+                        profit_pct = (position.entry_price - current_price) / position.entry_price
+                        unrealized_pnl = (position.entry_price - current_price) * position.quantity
                     
                     logger.debug(f"Position {position.market_id}: Entry=${position.entry_price:.3f}, Current=${current_price:.3f}, Profit={profit_pct:.1%}, PnL=${unrealized_pnl:.2f}")
                     
@@ -297,10 +358,15 @@ async def place_stop_loss_orders(
                 else:
                     current_price = market_data.get('no_price', 0) / 100
                 
-                # Calculate current loss
+                # Calculate current loss — side-aware
                 if current_price > 0:
-                    loss_pct = (current_price - position.entry_price) / position.entry_price
-                    unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                    if position.side.upper() == 'YES':
+                        loss_pct = (current_price - position.entry_price) / position.entry_price
+                        unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                    else:
+                        # For NO positions: loss when price rises
+                        loss_pct = (position.entry_price - current_price) / position.entry_price
+                        unrealized_pnl = (position.entry_price - current_price) * position.quantity
                     
                     # Use different stop-loss thresholds for weather vs other strategies
                     effective_threshold = stop_loss_threshold

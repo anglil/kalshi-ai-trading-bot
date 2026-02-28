@@ -279,6 +279,40 @@ async def run_consensus_weather_cycle(
     # Priority 3: Cap weather exposure at 30% of total portfolio
     WEATHER_EXPOSURE_CAP = 0.30  # Max 30% of portfolio for weather
     DAILY_DEPLOYMENT_LIMIT = 50.0  # Max $50/day in new weather buys
+    
+    # Check ACTUAL weather exposure from Kalshi API (not just bankroll calculation)
+    try:
+        api_positions = await kalshi_client._make_authenticated_request(
+            'GET', '/trade-api/v2/portfolio/positions'
+        )
+        weather_exposure_cents = 0
+        total_exposure_cents = 0
+        for mp in api_positions.get('market_positions', []):
+            exp = mp.get('market_exposure', 0)
+            total_exposure_cents += exp
+            ticker = mp.get('ticker', '')
+            if 'HIGH' in ticker or 'LOW' in ticker or 'TEMP' in ticker:
+                weather_exposure_cents += exp
+        
+        weather_exposure = weather_exposure_cents / 100
+        total_exposure = total_exposure_cents / 100
+        weather_pct = weather_exposure / bankroll * 100 if bankroll > 0 else 100
+        
+        logger.info(
+            f"ACTUAL WEATHER EXPOSURE: ${weather_exposure:.2f} ({weather_pct:.0f}% of ${bankroll:.2f} portfolio) "
+            f"| Total exposure: ${total_exposure:.2f}"
+        )
+        
+        # Hard block if weather already exceeds cap
+        if weather_pct >= WEATHER_EXPOSURE_CAP * 100:
+            logger.warning(
+                f"WEATHER CAP EXCEEDED: ${weather_exposure:.2f} is {weather_pct:.0f}% of portfolio "
+                f"(cap is {WEATHER_EXPOSURE_CAP*100:.0f}%). No new weather trades."
+            )
+            return results
+    except Exception as e:
+        logger.warning(f"Could not check API exposure: {e}")
+    
     weather_bankroll = bankroll * WEATHER_EXPOSURE_CAP
     if weather_bankroll < 5.0:
         logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f} (30% of ${bankroll:.2f})")
@@ -371,12 +405,43 @@ async def run_consensus_weather_cycle(
     max_trades = 3  # Reduced from 5 to limit daily deployment
 
     # Filter out signals for tickers where we already hold a position
+    # Use KALSHI API as source of truth (not just local DB which may be incomplete)
     held_tickers = set()
     city_position_counts: Dict[str, int] = defaultdict(int)
     held_brackets: Dict[str, List[Tuple[str, str, float]]] = defaultdict(list)
     try:
+        # Get positions from Kalshi API (source of truth)
+        from src.jobs.execute import _check_existing_kalshi_position
+        api_positions = await kalshi_client._make_authenticated_request(
+            'GET', '/trade-api/v2/portfolio/positions'
+        )
+        api_market_positions = api_positions.get('market_positions', [])
+        
+        # Build held_tickers from API positions (any non-zero position)
+        for mp in api_market_positions:
+            ticker = mp.get('ticker', '')
+            pos = mp.get('position', 0)
+            if pos != 0 and ('HIGH' in ticker or 'LOW' in ticker or 'TEMP' in ticker):
+                held_tickers.add(ticker)
+                city = _extract_city_from_ticker(ticker)
+                city_position_counts[city] += 1
+                parsed = _parse_bracket_from_ticker(ticker)
+                if parsed:
+                    bracket_type, threshold = parsed
+                    side = 'YES' if pos > 0 else 'NO'
+                    held_brackets[city].append((side, bracket_type, threshold))
+        
+        # Also add non-weather held tickers from API
+        for mp in api_market_positions:
+            ticker = mp.get('ticker', '')
+            pos = mp.get('position', 0)
+            if pos != 0:
+                held_tickers.add(ticker)
+        
+        # Fallback: also check local DB for any positions the API might miss
         open_positions = await db_manager.get_open_live_positions()
-        held_tickers = {p.market_id for p in open_positions}
+        for p in open_positions:
+            held_tickers.add(p.market_id)
 
         # Build per-city counts and held bracket info for weather positions
         for p in open_positions:

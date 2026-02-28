@@ -79,11 +79,15 @@ async def should_exit_position(
             )
             return True, f"stop_loss_triggered_pnl_{expected_pnl:.2f}", current_price
 
-    # 3. Take-profit exit — for both sides, trigger when position value rises
+    # 3. Take-profit exit — side-aware logic
     if position.take_profit_price:
-        # For both YES and NO: take profit when current price rises above target
-        # (higher price = position is more valuable for both sides)
-        take_profit_triggered = current_price >= position.take_profit_price
+        if position.side.upper() == 'YES':
+            # For YES positions: take profit when price rises above target
+            take_profit_triggered = current_price >= position.take_profit_price
+        else:
+            # For NO positions: take profit when price DROPS below target
+            # (NO position value increases as the market price decreases)
+            take_profit_triggered = current_price <= position.take_profit_price
 
         if take_profit_triggered:
             return True, "take_profit", current_price
@@ -231,8 +235,11 @@ async def run_tracking(db_manager: Optional[DatabaseManager] = None):
                         f"Entry: {position.entry_price:.3f}, Exit: {exit_price:.3f}"
                     )
                     
-                    # Calculate PnL
-                    pnl = (exit_price - position.entry_price) * position.quantity
+                    # Calculate PnL — must account for position side
+                    if position.side.upper() == 'YES':
+                        pnl = (exit_price - position.entry_price) * position.quantity
+                    else:
+                        pnl = (position.entry_price - exit_price) * position.quantity
                     
                     # Create trade log
                     trade_log = TradeLog(
@@ -260,7 +267,10 @@ async def run_tracking(db_manager: Optional[DatabaseManager] = None):
                 else:
                     # Log current position status for monitoring
                     current_price = current_yes_price if position.side == "YES" else current_no_price
-                    unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                    if position.side.upper() == 'YES':
+                        unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                    else:
+                        unrealized_pnl = (position.entry_price - current_price) * position.quantity
                     hours_held = (datetime.now() - position.timestamp).total_seconds() / 3600
                     
                     logger.debug(

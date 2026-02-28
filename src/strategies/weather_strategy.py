@@ -18,6 +18,7 @@ import asyncio
 import math
 import uuid
 from dataclasses import dataclass, field
+from src.jobs.execute import _check_existing_kalshi_position
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -438,13 +439,49 @@ async def execute_weather_trade(
     Returns True if order was placed successfully.
     """
     try:
-        # Check for existing position BEFORE placing order to prevent stacking
+        # Check for existing position on KALSHI API (not just local DB)
+        # This prevents the critical bug where DB UNIQUE constraint failures
+        # caused orders to be placed but not tracked, leading to massive accumulation
+        try:
+            existing_api = await _check_existing_kalshi_position(kalshi_client, signal.bracket.ticker)
+            existing_pos = existing_api.get('position', 0)
+            existing_qty = abs(existing_pos)
+            existing_side = 'YES' if existing_pos > 0 else 'NO' if existing_pos < 0 else None
+            
+            # Block contradictory positions
+            if existing_side and existing_side != signal.side.upper():
+                logger.info(
+                    f"⏭️ SKIP: Already hold {existing_qty} {existing_side} on "
+                    f"{signal.bracket.ticker} — would be contradictory to buy {signal.side}"
+                )
+                return False
+            
+            # Block if already at position limit
+            from src.jobs.execute import MAX_CONTRACTS_PER_MARKET
+            if existing_qty >= MAX_CONTRACTS_PER_MARKET:
+                logger.info(
+                    f"⏭️ SKIP: Already hold {existing_qty} contracts on "
+                    f"{signal.bracket.ticker} (max {MAX_CONTRACTS_PER_MARKET})"
+                )
+                return False
+            
+            # Reduce order size if it would exceed limit
+            allowed = MAX_CONTRACTS_PER_MARKET - existing_qty
+            if signal.shares > allowed:
+                logger.info(f"Reducing order from {signal.shares} to {allowed} on {signal.bracket.ticker}")
+                signal.shares = allowed
+                if signal.shares <= 0:
+                    return False
+        except Exception as e:
+            logger.warning(f"API position check failed, falling back to DB: {e}")
+        
+        # Also check local DB as backup
         existing = await db_manager.get_position_by_market_and_side(
             signal.bracket.ticker, signal.side,
         )
         if existing:
             logger.info(
-                f"⏭️ SKIP: Already hold {signal.bracket.ticker} {signal.side} — "
+                f"⏭️ SKIP: Already hold {signal.bracket.ticker} {signal.side} in DB — "
                 f"no duplicate order placed"
             )
             return False
