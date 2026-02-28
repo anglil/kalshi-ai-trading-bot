@@ -450,6 +450,21 @@ async def execute_weather_trade(
     Returns True if order was placed successfully.
     """
     try:
+        # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
+        MIN_CASH_TO_TRADE = 10.0  # Don't trade if cash < $10
+        try:
+            bal_resp = await kalshi_client.get_balance()
+            available_cash = bal_resp.get('balance', 0) / 100.0
+            if available_cash < MIN_CASH_TO_TRADE:
+                logger.warning(
+                    f"CAPITAL GUARD: Cash ${available_cash:.2f} < ${MIN_CASH_TO_TRADE:.2f} minimum. "
+                    f"Refusing to open new position on {signal.bracket.ticker}. "
+                    f"Wait for settlements to free up cash."
+                )
+                return False
+        except Exception as e:
+            logger.warning(f"Capital check failed: {e}")
+
         # Check for existing position on KALSHI API (not just local DB)
         # This prevents the critical bug where DB UNIQUE constraint failures
         # caused orders to be placed but not tracked, leading to massive accumulation

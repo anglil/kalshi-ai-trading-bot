@@ -345,6 +345,14 @@ async def run_flu_consensus_cycle(
     strategy_tag = "flu_consensus"
     logger.info(f"FLU CONSENSUS: Starting cycle (paper={paper_mode})...")
 
+    # EMERGENCY PAUSE: Flu uses the same broken Gaussian bracket model as weather/econ
+    FLU_TRADING_PAUSED = True
+    if FLU_TRADING_PAUSED:
+        logger.warning("FLU PAUSED: Flu trading paused — uses broken Gaussian bracket model. "
+                       "Set FLU_TRADING_PAUSED=False to resume.")
+        return {"markets_found": 0, "brackets_found": 0, "signals_generated": 0,
+                "orders_placed": 0, "total_position_value": 0.0, "paper_mode": paper_mode}
+
     # Auto-switch check
     if paper_mode and _check_paper_performance(strategy_tag):
         paper_mode = False

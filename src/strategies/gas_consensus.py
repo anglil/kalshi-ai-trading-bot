@@ -328,6 +328,14 @@ async def run_gas_consensus_cycle(
     strategy_tag = "gas_consensus"
     logger.info(f"GAS CONSENSUS: Starting cycle (paper={paper_mode})...")
 
+    # EMERGENCY PAUSE: Gas uses the same broken Gaussian bracket model as weather/econ
+    GAS_TRADING_PAUSED = True
+    if GAS_TRADING_PAUSED:
+        logger.warning("GAS PAUSED: Gas trading paused — uses broken Gaussian bracket model. "
+                       "Set GAS_TRADING_PAUSED=False to resume.")
+        return {"markets_found": 0, "brackets_found": 0, "signals_generated": 0,
+                "orders_placed": 0, "total_position_value": 0.0, "paper_mode": paper_mode}
+
     # Auto-switch check
     if paper_mode and _check_paper_performance(strategy_tag):
         paper_mode = False

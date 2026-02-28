@@ -496,6 +496,20 @@ async def _execute_leader_trade(
             )
             return True
 
+        # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
+        MIN_CASH_TO_TRADE = 10.0
+        try:
+            bal_resp = await kalshi_client.get_balance()
+            available_cash = bal_resp.get('balance', 0) / 100.0
+            if available_cash < MIN_CASH_TO_TRADE:
+                logger.warning(
+                    f"FTL CAPITAL GUARD: Cash ${available_cash:.2f} < ${MIN_CASH_TO_TRADE:.2f}. "
+                    f"Refusing to trade {signal.ticker}. Wait for settlements."
+                )
+                return False
+        except Exception as e:
+            logger.warning(f"FTL capital check failed: {e}")
+
         # === PRE-TRADE SAFETY CHECKS (via Kalshi API) ===
         from src.jobs.execute import _check_existing_kalshi_position, MAX_CONTRACTS_PER_MARKET
         try:
