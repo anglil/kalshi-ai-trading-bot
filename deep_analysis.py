@@ -1,383 +1,352 @@
 """
-Deep analysis of trading bot performance.
-Analyzes fills, orders, positions, settlements by strategy, market type, time, and identifies patterns.
+Deep analysis of all trading activity to identify the dominant loss driver.
+Pulls fills, settlements, orders, and positions from Kalshi API.
 """
+import asyncio
 import json
-import os
-import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from collections import defaultdict
-import re
+from src.clients.kalshi_client import KalshiClient
 
-# Load data
-with open('/tmp/full_analysis_data.json', 'r') as f:
-    data = json.load(f)
+async def main():
+    client = KalshiClient()
+    out = {}
 
-fills = data['fills']
-orders = data['orders']
-open_positions = data['open_positions']
-settled_positions = data['settled_positions']
-settlements = data['settlements']
-balance = data['balance']
+    # 1. Balance
+    balance = await client.get_balance()
+    out['balance'] = balance
+    print(f"Balance: ${balance.get('balance', 0)/100:.2f} cash, ${balance.get('portfolio_value', 0)/100:.2f} portfolio")
 
-cash = balance.get('balance', 0) / 100
-pv = balance.get('portfolio_value', 0) / 100
-total = cash + pv
-deposit = 400.0
-
-print("=" * 80)
-print("DEEP PERFORMANCE ANALYSIS — Kalshi AI Trading Bot")
-print("=" * 80)
-print(f"Analysis Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
-print(f"Account: Cash ${cash:.2f} + Portfolio ${pv:.2f} = Total ${total:.2f}")
-print(f"Deposit: ${deposit:.2f}")
-print(f"Total P&L: ${total - deposit:.2f} ({(total/deposit - 1)*100:.1f}%)")
-print()
-
-# ============================================================
-# 1. FILL ANALYSIS
-# ============================================================
-print("=" * 80)
-print("1. FILL ANALYSIS")
-print("=" * 80)
-
-# Classify fills by market type (ticker prefix)
-def classify_market(ticker):
-    t = ticker.upper()
-    if 'KXHIGH' in t or 'KXLOW' in t or 'KXRAIN' in t or 'KXSNOW' in t or 'KXWIND' in t:
-        return 'Weather'
-    elif 'KXNBA' in t:
-        return 'NBA'
-    elif 'KXNFL' in t:
-        return 'NFL'
-    elif 'KXNHL' in t:
-        return 'NHL'
-    elif 'KXSOCCER' in t or 'KXUCL' in t or 'KXEPL' in t:
-        return 'Soccer'
-    elif 'KXCPI' in t or 'KXGDP' in t or 'KXJOBLESS' in t or 'KXUNEMPLOY' in t or 'KXFED' in t:
-        return 'Economics'
-    elif 'KXGAS' in t or 'KXOIL' in t:
-        return 'Gas/Oil'
-    elif 'KXTRUMP' in t or 'KXSENATE' in t or 'KXHOUSE' in t or 'KXBIDEN' in t:
-        return 'Politics'
-    elif 'KXPGA' in t or 'KXGOLF' in t:
-        return 'Golf'
-    elif 'KXMV' in t or 'ESPORT' in t:
-        return 'Esports'
-    elif 'KXBTC' in t or 'KXETH' in t or 'KXCRYPTO' in t:
-        return 'Crypto'
-    elif 'KXSP500' in t or 'KXNASDAQ' in t or 'KXDOW' in t or 'KXSTOCK' in t:
-        return 'Stocks'
-    else:
-        return 'Other'
-
-# Parse fills
-fill_data = []
-for f_item in fills:
-    ticker = f_item.get('ticker', '')
-    side = f_item.get('side', '')
-    action = f_item.get('action', f_item.get('type', ''))
-    yes_price = f_item.get('yes_price', 0)
-    no_price = f_item.get('no_price', 0)
-    count = f_item.get('count', 0)
-    created = f_item.get('created_time', f_item.get('created_at', ''))
-    is_taker = f_item.get('is_taker', None)
-    order_id = f_item.get('order_id', '')
-    
-    # Price in cents
-    price = yes_price if side == 'yes' else no_price
-    cost = price * count / 100  # in dollars
-    
-    market_type = classify_market(ticker)
-    
-    fill_data.append({
-        'ticker': ticker,
-        'side': side,
-        'action': action,
-        'price': price,
-        'count': count,
-        'cost': cost,
-        'market_type': market_type,
-        'created': created,
-        'is_taker': is_taker,
-        'order_id': order_id
-    })
-
-# Summary by market type
-print("\n--- Fills by Market Type ---")
-type_stats = defaultdict(lambda: {'count': 0, 'buy_count': 0, 'sell_count': 0, 'buy_cost': 0, 'sell_cost': 0, 'tickers': set()})
-for fd in fill_data:
-    mt = fd['market_type']
-    type_stats[mt]['count'] += 1
-    type_stats[mt]['tickers'].add(fd['ticker'])
-    if fd['action'] == 'buy':
-        type_stats[mt]['buy_count'] += 1
-        type_stats[mt]['buy_cost'] += fd['cost']
-    else:
-        type_stats[mt]['sell_count'] += 1
-        type_stats[mt]['sell_cost'] += fd['cost']
-
-print(f"{'Market Type':<15} {'Fills':>6} {'Buys':>6} {'Sells':>6} {'Buy $':>10} {'Sell $':>10} {'Net $':>10} {'Markets':>8}")
-print("-" * 80)
-for mt in sorted(type_stats.keys(), key=lambda x: type_stats[x]['buy_cost'], reverse=True):
-    s = type_stats[mt]
-    net = s['sell_cost'] - s['buy_cost']
-    print(f"{mt:<15} {s['count']:>6} {s['buy_count']:>6} {s['sell_count']:>6} ${s['buy_cost']:>9.2f} ${s['sell_cost']:>9.2f} ${net:>9.2f} {len(s['tickers']):>8}")
-
-# ============================================================
-# 2. SETTLEMENT ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("2. SETTLEMENT ANALYSIS (Realized P&L)")
-print("=" * 80)
-
-settled_pnl = defaultdict(lambda: {'won': 0, 'lost': 0, 'pnl': 0, 'revenue': 0, 'cost': 0, 'tickers': set()})
-for s in settlements:
-    ticker = s.get('market_ticker', s.get('ticker', ''))
-    revenue = s.get('revenue', 0) / 100  # cents to dollars
-    settled_at = s.get('settled_time', s.get('settled_at', ''))
-    yes_price = s.get('yes_price', 0)
-    no_price = s.get('no_price', 0)
-    market_result = s.get('market_result', '')
-    
-    mt = classify_market(ticker)
-    settled_pnl[mt]['tickers'].add(ticker)
-    settled_pnl[mt]['revenue'] += revenue
-    
-    if revenue > 0:
-        settled_pnl[mt]['won'] += 1
-    else:
-        settled_pnl[mt]['lost'] += 1
-
-print(f"\n{'Market Type':<15} {'Won':>5} {'Lost':>5} {'Win%':>6} {'Revenue':>10} {'Markets':>8}")
-print("-" * 60)
-total_won = 0
-total_lost = 0
-total_revenue = 0
-for mt in sorted(settled_pnl.keys(), key=lambda x: settled_pnl[x]['revenue'], reverse=True):
-    s = settled_pnl[mt]
-    total_trades = s['won'] + s['lost']
-    win_pct = (s['won'] / total_trades * 100) if total_trades > 0 else 0
-    print(f"{mt:<15} {s['won']:>5} {s['lost']:>5} {win_pct:>5.1f}% ${s['revenue']:>9.2f} {len(s['tickers']):>8}")
-    total_won += s['won']
-    total_lost += s['lost']
-    total_revenue += s['revenue']
-
-total_trades_all = total_won + total_lost
-win_pct_all = (total_won / total_trades_all * 100) if total_trades_all > 0 else 0
-print("-" * 60)
-print(f"{'TOTAL':<15} {total_won:>5} {total_lost:>5} {win_pct_all:>5.1f}% ${total_revenue:>9.2f}")
-
-# ============================================================
-# 3. OPEN POSITIONS ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("3. OPEN POSITIONS ANALYSIS")
-print("=" * 80)
-
-pos_by_type = defaultdict(lambda: {'count': 0, 'exposure': 0, 'market_value': 0, 'tickers': []})
-for p in open_positions:
-    ticker = p.get('ticker', p.get('market_ticker', ''))
-    position = p.get('position', 0)
-    market_exposure = p.get('market_exposure', 0) / 100
-    total_traded = p.get('total_traded', 0) / 100
-    resting_orders_count = p.get('resting_orders_count', 0)
-    
-    mt = classify_market(ticker)
-    pos_by_type[mt]['count'] += 1
-    pos_by_type[mt]['exposure'] += market_exposure
-    pos_by_type[mt]['tickers'].append(ticker)
-
-print(f"\n{'Market Type':<15} {'Positions':>10} {'Exposure':>12} {'Tickers'}")
-print("-" * 80)
-for mt in sorted(pos_by_type.keys(), key=lambda x: pos_by_type[x]['exposure'], reverse=True):
-    p = pos_by_type[mt]
-    tickers_str = ', '.join(p['tickers'][:3])
-    if len(p['tickers']) > 3:
-        tickers_str += f" +{len(p['tickers'])-3} more"
-    print(f"{mt:<15} {p['count']:>10} ${p['exposure']:>10.2f}   {tickers_str}")
-
-# ============================================================
-# 4. ORDER ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("4. ORDER ANALYSIS")
-print("=" * 80)
-
-order_stats = defaultdict(lambda: {'total': 0, 'filled': 0, 'cancelled': 0, 'pending': 0, 'expired': 0})
-for o in orders:
-    ticker = o.get('ticker', '')
-    status = o.get('status', '')
-    mt = classify_market(ticker)
-    order_stats[mt]['total'] += 1
-    if status in ('executed', 'filled'):
-        order_stats[mt]['filled'] += 1
-    elif status == 'canceled':
-        order_stats[mt]['cancelled'] += 1
-    elif status in ('pending', 'resting'):
-        order_stats[mt]['pending'] += 1
-    else:
-        order_stats[mt]['expired'] += 1
-
-print(f"\n{'Market Type':<15} {'Total':>7} {'Filled':>7} {'Cancel':>7} {'Pending':>8} {'Other':>7} {'Fill%':>7}")
-print("-" * 65)
-for mt in sorted(order_stats.keys(), key=lambda x: order_stats[x]['total'], reverse=True):
-    o = order_stats[mt]
-    fill_pct = (o['filled'] / o['total'] * 100) if o['total'] > 0 else 0
-    print(f"{mt:<15} {o['total']:>7} {o['filled']:>7} {o['cancelled']:>7} {o['pending']:>8} {o['expired']:>7} {fill_pct:>6.1f}%")
-
-# ============================================================
-# 5. TEMPORAL ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("5. TEMPORAL ANALYSIS")
-print("=" * 80)
-
-hourly_fills = defaultdict(int)
-daily_fills = defaultdict(lambda: {'count': 0, 'buy_cost': 0, 'sell_cost': 0})
-for fd in fill_data:
-    ts = fd['created']
-    if ts:
+    # 2. Get ALL fills (paginated)
+    all_fills = []
+    cursor = None
+    for page in range(50):
+        params = {'limit': 100}
+        if cursor:
+            params['cursor'] = cursor
         try:
-            dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-            hourly_fills[dt.hour] += 1
-            day = dt.strftime('%Y-%m-%d')
-            daily_fills[day]['count'] += 1
-            if fd['action'] == 'buy':
-                daily_fills[day]['buy_cost'] += fd['cost']
-            else:
-                daily_fills[day]['sell_cost'] += fd['cost']
-        except:
-            pass
-
-print("\n--- Hourly Distribution (UTC) ---")
-for h in sorted(hourly_fills.keys()):
-    bar = '#' * (hourly_fills[h] // 2)
-    print(f"  {h:02d}:00  {hourly_fills[h]:>4} fills  {bar}")
-
-print("\n--- Daily Summary ---")
-print(f"{'Date':<12} {'Fills':>6} {'Buy $':>10} {'Sell $':>10} {'Net $':>10}")
-print("-" * 55)
-for day in sorted(daily_fills.keys()):
-    d = daily_fills[day]
-    net = d['sell_cost'] - d['buy_cost']
-    print(f"{day:<12} {d['count']:>6} ${d['buy_cost']:>9.2f} ${d['sell_cost']:>9.2f} ${net:>9.2f}")
-
-# ============================================================
-# 6. FEES ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("6. FEES ANALYSIS")
-print("=" * 80)
-
-total_fees = 0
-for f_item in fills:
-    fee = f_item.get('fee', 0)
-    if isinstance(fee, (int, float)):
-        total_fees += fee
-
-total_fees_dollars = total_fees / 100
-print(f"Total Fees Paid: ${total_fees_dollars:.2f}")
-print(f"Fees as % of Deposit: {total_fees_dollars/deposit*100:.1f}%")
-print(f"Avg Fee per Fill: ${total_fees_dollars/len(fills):.4f}" if fills else "N/A")
-
-# ============================================================
-# 7. WORST POSITIONS
-# ============================================================
-print("\n" + "=" * 80)
-print("7. WORST SETTLED POSITIONS (Biggest Losses)")
-print("=" * 80)
-
-# Sort settlements by revenue (ascending = worst first)
-sorted_settlements = sorted(settlements, key=lambda x: x.get('revenue', 0))
-print(f"\n{'Ticker':<55} {'Revenue':>10} {'Type':<12}")
-print("-" * 80)
-for s in sorted_settlements[:15]:
-    ticker = s.get('market_ticker', s.get('ticker', ''))
-    revenue = s.get('revenue', 0) / 100
-    mt = classify_market(ticker)
-    print(f"{ticker:<55} ${revenue:>9.2f} {mt:<12}")
-
-print("\n--- Best Settled Positions ---")
-for s in sorted_settlements[-10:]:
-    ticker = s.get('market_ticker', s.get('ticker', ''))
-    revenue = s.get('revenue', 0) / 100
-    mt = classify_market(ticker)
-    print(f"{ticker:<55} ${revenue:>9.2f} {mt:<12}")
-
-# ============================================================
-# 8. TAKER vs MAKER ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("8. TAKER vs MAKER ANALYSIS")
-print("=" * 80)
-
-taker_count = sum(1 for fd in fill_data if fd['is_taker'] == True)
-maker_count = sum(1 for fd in fill_data if fd['is_taker'] == False)
-unknown_count = len(fill_data) - taker_count - maker_count
-print(f"Taker fills: {taker_count} ({taker_count/len(fill_data)*100:.1f}%)")
-print(f"Maker fills: {maker_count} ({maker_count/len(fill_data)*100:.1f}%)")
-print(f"Unknown: {unknown_count}")
-
-# ============================================================
-# 9. POSITION SIZE ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("9. POSITION SIZE ANALYSIS")
-print("=" * 80)
-
-costs = [fd['cost'] for fd in fill_data if fd['action'] == 'buy' and fd['cost'] > 0]
-if costs:
-    costs.sort()
-    print(f"Total buy fills: {len(costs)}")
-    print(f"Min position: ${min(costs):.2f}")
-    print(f"Max position: ${max(costs):.2f}")
-    print(f"Avg position: ${sum(costs)/len(costs):.2f}")
-    print(f"Median position: ${costs[len(costs)//2]:.2f}")
-    print(f"Total deployed: ${sum(costs):.2f}")
+            resp = await client._make_authenticated_request(
+                'GET', '/trade-api/v2/portfolio/fills', params=params
+            )
+            fills = resp.get('fills', [])
+            all_fills.extend(fills)
+            cursor = resp.get('cursor')
+            if not fills or not cursor:
+                break
+        except Exception as e:
+            print(f"Fills page {page} error: {e}")
+            break
     
-    # Distribution
-    buckets = {'$0-1': 0, '$1-5': 0, '$5-10': 0, '$10-20': 0, '$20-50': 0, '$50+': 0}
-    for c in costs:
-        if c < 1: buckets['$0-1'] += 1
-        elif c < 5: buckets['$1-5'] += 1
-        elif c < 10: buckets['$5-10'] += 1
-        elif c < 20: buckets['$10-20'] += 1
-        elif c < 50: buckets['$20-50'] += 1
-        else: buckets['$50+'] += 1
-    print("\nPosition Size Distribution:")
-    for bucket, count in buckets.items():
-        bar = '#' * count
-        print(f"  {bucket:<8} {count:>4}  {bar}")
+    print(f"\nTotal fills: {len(all_fills)}")
 
-# ============================================================
-# 10. RAW DATA DUMP FOR FURTHER ANALYSIS
-# ============================================================
-print("\n" + "=" * 80)
-print("10. KEY FINDINGS SUMMARY")
-print("=" * 80)
+    # 3. Get ALL settlements (paginated)
+    all_settlements = []
+    cursor = None
+    for page in range(50):
+        params = {'limit': 100}
+        if cursor:
+            params['cursor'] = cursor
+        try:
+            resp = await client._make_authenticated_request(
+                'GET', '/trade-api/v2/portfolio/settlements', params=params
+            )
+            settlements = resp.get('settlements', [])
+            all_settlements.extend(settlements)
+            cursor = resp.get('cursor')
+            if not settlements or not cursor:
+                break
+        except Exception as e:
+            print(f"Settlements page {page} error: {e}")
+            break
+    
+    print(f"Total settlements: {len(all_settlements)}")
 
-print(f"""
-ACCOUNT STATUS:
-  Starting Deposit:  $400.00
-  Current Total:     ${total:.2f}
-  Total P&L:         ${total - deposit:.2f} ({(total/deposit-1)*100:.1f}%)
-  Cash Available:    ${cash:.2f}
-  Portfolio Value:   ${pv:.2f}
-  
-ACTIVITY:
-  Total Fills:       {len(fills)}
-  Total Orders:      {len(orders)}
-  Open Positions:    {len(open_positions)}
-  Settled Positions: {len(settled_positions)}
-  Settlements:       {len(settlements)}
-  Total Fees:        ${total_fees_dollars:.2f}
-  
-STRATEGY BREAKDOWN:
-  Dominant Strategy: Weather ({type_stats.get('Weather', {}).get('count', 0)} fills)
-  Most Positions:    Weather ({pos_by_type.get('Weather', {}).get('count', 0)} open)
-  
-RISK METRICS:
-  Max Drawdown:      ${deposit - total:.2f} ({(1 - total/deposit)*100:.1f}% from deposit)
-  Taker Rate:        {taker_count/len(fill_data)*100:.1f}%
-""")
+    # 4. Current positions
+    positions_resp = await client._make_authenticated_request(
+        'GET', '/trade-api/v2/portfolio/positions'
+    )
+    positions = [mp for mp in positions_resp.get('market_positions', []) if mp.get('position', 0) != 0]
+    print(f"Active positions: {len(positions)}")
+
+    # 5. Classify tickers
+    def classify(ticker):
+        t = ticker.upper()
+        if any(k in t for k in ['HIGH', 'LOW', 'TEMP', 'RAIN', 'SNOW']):
+            return 'weather'
+        elif 'CPI' in t:
+            return 'economics'
+        elif 'NBA' in t:
+            return 'sports'
+        elif any(k in t for k in ['GREENLAND', 'KHAMENEI', 'MEDIA']):
+            return 'political'
+        elif 'MV' in t or 'ESPORT' in t:
+            return 'esports'
+        else:
+            return 'other'
+
+    # 6. Analyze fills by ticker — compute cost basis
+    ticker_data = defaultdict(lambda: {
+        'buys': [], 'sells': [], 'buy_cost_cents': 0, 'sell_revenue_cents': 0,
+        'contracts_bought': 0, 'contracts_sold': 0, 'fees_cents': 0,
+        'taker_fills': 0, 'maker_fills': 0,
+    })
+    
+    for f in all_fills:
+        ticker = f.get('ticker', '')
+        side = f.get('side', '')
+        action = f.get('action', '')
+        count = f.get('count', 0)
+        yes_price = f.get('yes_price', 0)
+        no_price = f.get('no_price', 0)
+        is_taker = f.get('is_taker', False)
+        
+        price = yes_price if side == 'yes' else no_price
+        cost_cents = price * count
+        
+        td = ticker_data[ticker]
+        if action == 'buy':
+            td['buys'].append(f)
+            td['buy_cost_cents'] += cost_cents
+            td['contracts_bought'] += count
+        elif action == 'sell':
+            td['sells'].append(f)
+            td['sell_revenue_cents'] += cost_cents
+            td['contracts_sold'] += count
+        
+        if is_taker:
+            td['taker_fills'] += 1
+        else:
+            td['maker_fills'] += 1
+
+    # 7. Map settlements by ticker
+    settlement_by_ticker = defaultdict(lambda: {'revenue_cents': 0, 'count': 0})
+    for s in all_settlements:
+        ticker = s.get('market_ticker', s.get('ticker', ''))
+        revenue = s.get('revenue', 0)
+        settlement_by_ticker[ticker]['revenue_cents'] += revenue
+        settlement_by_ticker[ticker]['count'] += 1
+
+    # 8. Compute per-ticker P&L
+    ticker_pnl = {}
+    for ticker, td in ticker_data.items():
+        settlement_rev = settlement_by_ticker.get(ticker, {}).get('revenue_cents', 0)
+        net_pnl = td['sell_revenue_cents'] + settlement_rev - td['buy_cost_cents']
+        
+        cat = classify(ticker)
+        settled = ticker in settlement_by_ticker
+        
+        ticker_pnl[ticker] = {
+            'category': cat,
+            'buy_cost_cents': td['buy_cost_cents'],
+            'sell_revenue_cents': td['sell_revenue_cents'],
+            'settlement_revenue_cents': settlement_rev,
+            'net_pnl_cents': net_pnl,
+            'contracts_bought': td['contracts_bought'],
+            'contracts_sold': td['contracts_sold'],
+            'avg_buy_price': td['buy_cost_cents'] / max(1, td['contracts_bought']),
+            'settled': settled,
+            'taker_fills': td['taker_fills'],
+            'maker_fills': td['maker_fills'],
+            'total_fills': td['taker_fills'] + td['maker_fills'],
+        }
+
+    # 9. Category aggregation
+    cat_agg = defaultdict(lambda: {
+        'buy_cost': 0, 'sell_rev': 0, 'settle_rev': 0, 'net_pnl': 0,
+        'tickers': 0, 'contracts': 0, 'settled_wins': 0, 'settled_losses': 0,
+        'taker_fills': 0, 'maker_fills': 0,
+    })
+    
+    for ticker, d in ticker_pnl.items():
+        cat = d['category']
+        cat_agg[cat]['buy_cost'] += d['buy_cost_cents']
+        cat_agg[cat]['sell_rev'] += d['sell_revenue_cents']
+        cat_agg[cat]['settle_rev'] += d['settlement_revenue_cents']
+        cat_agg[cat]['net_pnl'] += d['net_pnl_cents']
+        cat_agg[cat]['tickers'] += 1
+        cat_agg[cat]['contracts'] += d['contracts_bought']
+        cat_agg[cat]['taker_fills'] += d['taker_fills']
+        cat_agg[cat]['maker_fills'] += d['maker_fills']
+        if d['settled']:
+            if d['settlement_revenue_cents'] > 0:
+                cat_agg[cat]['settled_wins'] += 1
+            elif d['settlement_revenue_cents'] == 0 and d['buy_cost_cents'] > 0:
+                cat_agg[cat]['settled_losses'] += 1
+            else:
+                cat_agg[cat]['settled_losses'] += 1
+
+    # 10. Print category breakdown
+    print("\n" + "="*90)
+    print("CATEGORY P&L BREAKDOWN")
+    print("="*90)
+    print(f"{'Category':<12} {'Buy Cost':>10} {'Sell Rev':>10} {'Settle Rev':>10} {'Net P&L':>10} {'Tickers':>8} {'Contracts':>10} {'Win Rate':>9} {'Taker%':>7}")
+    print("-"*90)
+    
+    total_buy = 0
+    total_sell = 0
+    total_settle = 0
+    total_net = 0
+    
+    for cat in sorted(cat_agg.keys(), key=lambda x: cat_agg[x]['net_pnl']):
+        d = cat_agg[cat]
+        total_settled = d['settled_wins'] + d['settled_losses']
+        wr = d['settled_wins'] / max(1, total_settled) * 100
+        total_fills = d['taker_fills'] + d['maker_fills']
+        taker_pct = d['taker_fills'] / max(1, total_fills) * 100
+        
+        print(f"{cat:<12} ${d['buy_cost']/100:>9.2f} ${d['sell_rev']/100:>9.2f} ${d['settle_rev']/100:>9.2f} ${d['net_pnl']/100:>9.2f} {d['tickers']:>8} {d['contracts']:>10} {wr:>7.0f}% {taker_pct:>6.0f}%")
+        
+        total_buy += d['buy_cost']
+        total_sell += d['sell_rev']
+        total_settle += d['settle_rev']
+        total_net += d['net_pnl']
+    
+    print("-"*90)
+    print(f"{'TOTAL':<12} ${total_buy/100:>9.2f} ${total_sell/100:>9.2f} ${total_settle/100:>9.2f} ${total_net/100:>9.2f}")
+
+    # 11. Top 20 losing tickers
+    print("\n" + "="*90)
+    print("TOP 20 LOSING TICKERS")
+    print("="*90)
+    sorted_t = sorted(ticker_pnl.items(), key=lambda x: x[1]['net_pnl_cents'])
+    for ticker, d in sorted_t[:20]:
+        print(f"  {ticker:<45} P&L=${d['net_pnl_cents']/100:>8.2f} | "
+              f"bought {d['contracts_bought']:>3} @ avg {d['avg_buy_price']:>4.0f}c | "
+              f"settle=${d['settlement_revenue_cents']/100:>6.2f} | "
+              f"taker={d['taker_fills']}/{d['total_fills']} | {d['category']}")
+
+    # 12. Top 10 winning tickers
+    print("\n" + "="*90)
+    print("TOP 10 WINNING TICKERS")
+    print("="*90)
+    for ticker, d in sorted_t[-10:]:
+        print(f"  {ticker:<45} P&L=${d['net_pnl_cents']/100:>8.2f} | "
+              f"bought {d['contracts_bought']:>3} @ avg {d['avg_buy_price']:>4.0f}c | "
+              f"settle=${d['settlement_revenue_cents']/100:>6.2f} | {d['category']}")
+
+    # 13. Weather-specific deep dive
+    print("\n" + "="*90)
+    print("WEATHER DEEP DIVE")
+    print("="*90)
+    
+    weather_tickers = {t: d for t, d in ticker_pnl.items() if d['category'] == 'weather'}
+    settled_weather = {t: d for t, d in weather_tickers.items() if d['settled']}
+    unsettled_weather = {t: d for t, d in weather_tickers.items() if not d['settled']}
+    
+    # Parse city from ticker
+    def get_city(ticker):
+        t = ticker.upper()
+        if 'CHI' in t: return 'Chicago'
+        if 'MIA' in t: return 'Miami'
+        if 'AUS' in t: return 'Austin'
+        if 'NY' in t: return 'New York'
+        if 'LA' in t or 'LAX' in t: return 'Los Angeles'
+        if 'DEN' in t: return 'Denver'
+        if 'ATL' in t: return 'Atlanta'
+        return 'Unknown'
+    
+    # Parse date from ticker
+    def get_date(ticker):
+        import re
+        m = re.search(r'26([A-Z]{3})(\d{2})', ticker)
+        if m:
+            return f"Feb {m.group(2)}" if m.group(1) == 'FEB' else f"{m.group(1)} {m.group(2)}"
+        return 'Unknown'
+    
+    # City-level P&L
+    city_pnl = defaultdict(lambda: {'pnl': 0, 'cost': 0, 'contracts': 0, 'tickers': 0, 'wins': 0, 'losses': 0})
+    for t, d in weather_tickers.items():
+        city = get_city(t)
+        city_pnl[city]['pnl'] += d['net_pnl_cents']
+        city_pnl[city]['cost'] += d['buy_cost_cents']
+        city_pnl[city]['contracts'] += d['contracts_bought']
+        city_pnl[city]['tickers'] += 1
+        if d['settled'] and d['settlement_revenue_cents'] > 0:
+            city_pnl[city]['wins'] += 1
+        elif d['settled']:
+            city_pnl[city]['losses'] += 1
+    
+    print("\n--- Weather P&L by City ---")
+    print(f"{'City':<15} {'P&L':>10} {'Cost':>10} {'Contracts':>10} {'Tickers':>8} {'W/L':>8}")
+    print("-"*65)
+    for city in sorted(city_pnl.keys(), key=lambda x: city_pnl[x]['pnl']):
+        d = city_pnl[city]
+        print(f"{city:<15} ${d['pnl']/100:>9.2f} ${d['cost']/100:>9.2f} {d['contracts']:>10} {d['tickers']:>8} {d['wins']}W/{d['losses']}L")
+
+    # Settled weather detail
+    print(f"\n--- Settled Weather ({len(settled_weather)} tickers) ---")
+    wins = sum(1 for d in settled_weather.values() if d['settlement_revenue_cents'] > 0)
+    losses = len(settled_weather) - wins
+    total_settle_rev = sum(d['settlement_revenue_cents'] for d in settled_weather.values())
+    total_buy_cost = sum(d['buy_cost_cents'] for d in settled_weather.values())
+    print(f"  Win rate: {wins}/{len(settled_weather)} = {wins/max(1,len(settled_weather))*100:.0f}%")
+    print(f"  Total buy cost: ${total_buy_cost/100:.2f}")
+    print(f"  Total settlement revenue: ${total_settle_rev/100:.2f}")
+    print(f"  Net settled P&L: ${(total_settle_rev - total_buy_cost)/100:.2f}")
+    
+    # Show each settled weather ticker
+    for t in sorted(settled_weather.keys(), key=lambda x: settled_weather[x]['net_pnl_cents']):
+        d = settled_weather[t]
+        result = "WIN" if d['settlement_revenue_cents'] > 0 else "LOSS"
+        print(f"    {t:<45} {result:>4} | cost=${d['buy_cost_cents']/100:>6.2f} settle=${d['settlement_revenue_cents']/100:>6.2f} P&L=${d['net_pnl_cents']/100:>7.2f} | {d['contracts_bought']} contracts")
+
+    # Unsettled weather
+    print(f"\n--- Unsettled Weather ({len(unsettled_weather)} tickers, current risk) ---")
+    total_unsettled_cost = sum(d['buy_cost_cents'] for d in unsettled_weather.values())
+    print(f"  Total cost at risk: ${total_unsettled_cost/100:.2f}")
+    for t in sorted(unsettled_weather.keys(), key=lambda x: unsettled_weather[x]['buy_cost_cents'], reverse=True):
+        d = unsettled_weather[t]
+        print(f"    {t:<45} cost=${d['buy_cost_cents']/100:>6.2f} | {d['contracts_bought']} contracts @ avg {d['avg_buy_price']:.0f}c")
+
+    # 14. Taker vs Maker analysis
+    print("\n" + "="*90)
+    print("TAKER vs MAKER ANALYSIS")
+    print("="*90)
+    total_taker = sum(1 for f in all_fills if f.get('is_taker', False))
+    total_maker = len(all_fills) - total_taker
+    print(f"Taker fills: {total_taker} ({total_taker/max(1,len(all_fills))*100:.0f}%)")
+    print(f"Maker fills: {total_maker} ({total_maker/max(1,len(all_fills))*100:.0f}%)")
+    
+    # Taker cost analysis
+    taker_cost = sum(f.get('count', 0) * (f.get('yes_price', 0) if f.get('side') == 'yes' else f.get('no_price', 0)) 
+                     for f in all_fills if f.get('is_taker', False) and f.get('action') == 'buy')
+    maker_cost = sum(f.get('count', 0) * (f.get('yes_price', 0) if f.get('side') == 'yes' else f.get('no_price', 0))
+                     for f in all_fills if not f.get('is_taker', False) and f.get('action') == 'buy')
+    print(f"Taker buy volume: ${taker_cost/100:.2f}")
+    print(f"Maker buy volume: ${maker_cost/100:.2f}")
+
+    # 15. Position size distribution for weather
+    print("\n" + "="*90)
+    print("WEATHER POSITION SIZE ANALYSIS")
+    print("="*90)
+    weather_sizes = [(t, d['contracts_bought'], d['buy_cost_cents']/100) 
+                     for t, d in weather_tickers.items()]
+    weather_sizes.sort(key=lambda x: x[1], reverse=True)
+    print(f"{'Ticker':<45} {'Contracts':>10} {'Cost':>10}")
+    print("-"*70)
+    for t, contracts, cost in weather_sizes[:20]:
+        print(f"{t:<45} {contracts:>10} ${cost:>9.2f}")
+    
+    total_weather_contracts = sum(x[1] for x in weather_sizes)
+    total_weather_cost = sum(x[2] for x in weather_sizes)
+    print(f"\nTotal weather contracts: {total_weather_contracts}")
+    print(f"Total weather cost: ${total_weather_cost:.2f}")
+    print(f"Avg cost per contract: ${total_weather_cost/max(1,total_weather_contracts):.2f}")
+
+    # Save raw data
+    with open('/home/ubuntu/deep_analysis_raw.json', 'w') as f:
+        json.dump({
+            'fills_count': len(all_fills),
+            'settlements_count': len(all_settlements),
+            'category_pnl': {k: dict(v) for k, v in cat_agg.items()},
+            'ticker_pnl': ticker_pnl,
+            'total_buy_cents': total_buy,
+            'total_sell_cents': total_sell,
+            'total_settle_cents': total_settle,
+            'total_net_cents': total_net,
+        }, f, indent=2, default=str)
+    
+    print("\n\nRaw data saved to /home/ubuntu/deep_analysis_raw.json")
+    await client.close()
+
+asyncio.run(main())

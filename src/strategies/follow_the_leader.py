@@ -67,7 +67,7 @@ TOP_N_LEADERS          = 100     # follow top 100 leader signals
 MIN_LEADER_SCORE       = 3.0     # minimum score to act on
 MAX_POSITION_DOLLARS   = 25.0    # max $ per follow-trade (increased from 15)
 KELLY_FRACTION         = 0.35    # slightly more aggressive Kelly for copy-trading (increased from 0.25)
-MIN_YES_PRICE          = 5       # cents — avoid near-zero markets
+MIN_YES_PRICE          = 15      # cents — avoid near-zero markets (raised from 5)
 MAX_YES_PRICE          = 95      # cents — avoid near-certain markets
 MIN_VOLUME             = 50      # min total volume for a market to be liquid enough
 CYCLE_INTERVAL_SECS    = 1800    # 30 minutes
@@ -473,6 +473,11 @@ async def _execute_leader_trade(
 
         shares = max(1, int(position_dollars / price_dollars))
         actual_dollars = shares * price_dollars
+
+        # Minimum price floor check
+        if signal.price_cents < MIN_YES_PRICE:
+            logger.debug(f"FTL: price {signal.price_cents}c below minimum {MIN_YES_PRICE}c for {signal.ticker}")
+            return False
 
         # Fee check
         fee = kalshi_taker_fee(signal.price_cents)

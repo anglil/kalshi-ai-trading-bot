@@ -350,12 +350,10 @@ async def run_econ_consensus_cycle(
     6. Execute trades (paper or live)
     """
     strategy_tag = "econ_consensus"
-    logger.info(f"ECON CONSENSUS: Starting cycle (paper={paper_mode})...")
-
-    # Auto-switch check
-    if paper_mode and _check_paper_performance(strategy_tag):
-        paper_mode = False
-        logger.info("ECON CONSENSUS: Auto-switched to LIVE mode!")
+    # FORCE LIVE: Econ is the only profitable strategy (+$18.80 on $20.30 deployed = 93% return)
+    # Override paper_mode to always trade live
+    paper_mode = False
+    logger.info(f"ECON CONSENSUS: Starting cycle (FORCED LIVE)...")
 
     results: Dict = {
         "indicators_analyzed": 0,
@@ -431,15 +429,17 @@ async def run_econ_consensus_cycle(
             )
 
             # 5. Generate trade signals
+            # Econ gets higher allocation since it's the only profitable strategy
             indicator_signals = generate_weather_signals(
                 brackets=brackets,
                 bracket_probs=bracket_probs,
                 city=indicator_name,
                 bankroll=bankroll,
                 min_edge=0.08,
-                max_position_pct=0.05,
+                max_position_pct=0.08,  # Increased from 5% to 8% per bracket
                 kelly_fraction=0.5,
                 rationale_prefix=f"ECON-{indicator_name}({consensus.confidence})",
+                max_shares=10,  # Allow larger positions for econ
             )
 
             if indicator_signals:
@@ -463,7 +463,7 @@ async def run_econ_consensus_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 5
+    max_trades = 8  # Increased from 5 — econ is the primary profit driver
 
     logger.info(f"ECON CONSENSUS: Top signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):

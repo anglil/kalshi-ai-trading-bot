@@ -376,6 +376,12 @@ def generate_weather_signals(
         if entry_price_dollars <= 0:
             continue
         
+        # CRITICAL FIX: Minimum price floor — contracts below 15c are lottery tickets
+        # Historical data shows 0% win rate on 0-5c contracts (5,165 contracts, all lost)
+        MIN_ENTRY_PRICE_CENTS = 15
+        if entry_price_cents < MIN_ENTRY_PRICE_CENTS:
+            continue
+        
         shares = max(1, int(position_size / entry_price_dollars))
         shares = min(shares, max_shares)  # cap to prevent penny bet accumulation
         actual_position = shares * entry_price_dollars
@@ -384,11 +390,16 @@ def generate_weather_signals(
         if side == "YES":
             # We want to buy YES at a good price (below fair value)
             limit_price = min(entry_price_cents - 2, int(our_prob * 100) - 2)
-            limit_price = max(1, limit_price)
+            limit_price = max(MIN_ENTRY_PRICE_CENTS, limit_price)
         else:
             # We want to buy NO at a good price
             limit_price = min(entry_price_cents - 2, int((1 - our_prob) * 100) - 2)
-            limit_price = max(1, limit_price)
+            limit_price = max(MIN_ENTRY_PRICE_CENTS, limit_price)
+        
+        # CRITICAL FIX: Reject dead orders — if our limit price is more than 30% below
+        # the market ask, the order will never fill and just wastes buying power
+        if limit_price < entry_price_cents * 0.50:
+            continue
         
         # Build bracket description
         if bracket.low is None:

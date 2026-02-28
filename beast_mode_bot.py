@@ -462,8 +462,8 @@ class BeastModeBot:
                     )
                 else:
                     self.logger.info(f"📊 Econ Cycle #{cycle}: No trades this cycle")
-                # Run every 2 hours (increased frequency for diversification)
-                await asyncio.sleep(7200)
+                # Run every 1 hour (econ is the primary profit driver)
+                await asyncio.sleep(3600)
             except Exception as e:
                 self.logger.error(f"Error in econ trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)

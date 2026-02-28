@@ -45,6 +45,7 @@ MIN_EDGE_THRESHOLD = 0.15        # 15% minimum edge (raised from 8%)
 KELLY_FRACTION = 0.25            # Quarter-Kelly (reduced from 0.5)
 MAX_POSITION_PCT = 0.03          # 3% per bracket (reduced from 5%)
 MAX_SHARES_PER_TRADE = 5         # Cap shares per trade (reduced from 10)
+WEATHER_TRADING_PAUSED = True    # EMERGENCY: Pause weather trading until model is validated
 
 
 # ============================================================
@@ -268,6 +269,13 @@ async def run_consensus_weather_cycle(
         "orders_placed": 0,
         "total_position_value": 0.0,
     }
+
+    # EMERGENCY PAUSE: Weather model has 0% win rate on tail brackets
+    # Do NOT place new weather trades until model is backtested and validated
+    if WEATHER_TRADING_PAUSED:
+        logger.warning("WEATHER PAUSED: Weather trading is paused until model is validated. "
+                       "Set WEATHER_TRADING_PAUSED=False in weather_consensus.py to resume.")
+        return results
 
     # Get total portfolio value (cash + positions) for proper bankroll sizing
     try:
