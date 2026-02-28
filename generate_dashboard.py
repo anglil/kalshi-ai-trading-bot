@@ -21,6 +21,24 @@ async def fetch_data():
     data['positions'] = await client.get_positions()
     data['fills'] = await client.get_fills(limit=1000)
     data['orders'] = await client.get_orders()
+
+    # Fetch ALL settlements (paginated)
+    all_settlements = []
+    cursor = None
+    while True:
+        params = {'limit': 100}
+        if cursor:
+            params['cursor'] = cursor
+        result = await client._make_authenticated_request(
+            'GET', '/trade-api/v2/portfolio/settlements', params=params
+        )
+        settlements = result.get('settlements', [])
+        all_settlements.extend(settlements)
+        cursor = result.get('cursor')
+        if not cursor or not settlements:
+            break
+    data['settlements'] = all_settlements
+
     await client.close()
     return data
 
@@ -28,58 +46,111 @@ async def fetch_data():
 KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
 
 
-def build_portfolio_timeline(fills, balance_now, portfolio_value_now):
+def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_now):
     """
-    Reconstruct total portfolio value (cash + unrealized positions) over time.
+    Reconstruct total portfolio value (cash + position cost basis) over time
+    by replaying every fill and settlement chronologically.
 
-    Formula: total(t) = deposit - cumulative_fees(t) + gross_pnl_interpolated(t)
+    At each event, we track:
+      - cash: starts at deposit, decreases on buys, increases on sells and settlements
+      - position_cost: total cost basis of open positions (increases on buys, decreases on settlements)
+      - total = cash + position_cost  (approximation; uses cost basis, not mark-to-market)
 
-    Derivation:
-      cash(t) + positions(t) = deposit - fees(t) + realized_pnl(t) + unrealized_pnl(t)
-    Since we can't observe historical market prices, we interpolate the gross P&L
-    (= total_now - deposit + total_fees) linearly across time. This correctly anchors
-    the curve at deposit=$400 at the start and total_now at the end, with the fee
-    drag visible as a gradual downward pressure.
+    The final point is anchored to the live API value (cash + portfolio_value) for accuracy.
     """
+    from dateutil.parser import isoparse
     deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
-    fills_sorted = sorted(fills, key=lambda x: x.get('ts', 0))
 
-    total_fees_all = sum(float(f.get('fee_cost', 0)) for f in fills_sorted)
-    # Gross P&L before fees (what the positions earned/lost in aggregate)
-    gross_pnl = total_now - deposit + total_fees_all
+    # Build unified event list
+    events = []
 
-    t_start = fills_sorted[0]['ts']
-    t_end = int(datetime.now(tz=timezone.utc).timestamp())
-    t_range = max(1, t_end - t_start)
+    for f in fills:
+        ts = f.get('ts', 0)
+        action = f.get('action', 'buy')
+        count = int(f.get('count', 0))
+        side = f.get('side', 'yes')
+        fee = float(f.get('fee_cost', 0))
+        price_cents = f.get('yes_price', 0) if side == 'yes' else f.get('no_price', 0)
+        cost_dollars = count * price_cents / 100.0
+        events.append({
+            'ts': ts,
+            'type': 'fill',
+            'action': action,
+            'cost': cost_dollars,
+            'fee': fee,
+        })
 
-    cum_fees = 0.0
+    for s in settlements:
+        # Parse settlement time
+        settled_str = s.get('settled_time', '')
+        try:
+            settled_dt = isoparse(settled_str)
+            ts = int(settled_dt.timestamp())
+        except Exception:
+            continue
+        revenue = s.get('revenue', 0) / 100.0  # cents to dollars
+        yes_cost = s.get('yes_total_cost', 0) / 100.0
+        no_cost = s.get('no_total_cost', 0) / 100.0
+        total_cost = yes_cost + no_cost
+        fee = float(s.get('fee_cost', '0'))
+        events.append({
+            'ts': ts,
+            'type': 'settlement',
+            'revenue': revenue,
+            'cost_returned': total_cost,  # cost basis freed up
+            'fee': fee,
+        })
+
+    events.sort(key=lambda x: x['ts'])
+    if not events:
+        return [{'ts': 0, 'label': 'Now', 'total': total_now}], deposit
+
+    cash = deposit
+    position_cost = 0.0
     timeline = []
 
-    # Starting point: deposit, no fees yet
+    # Starting point
+    t_start = events[0]['ts']
     timeline.append({
-        'ts': t_start,
-        'label': datetime.fromtimestamp(t_start, tz=timezone.utc).strftime('%b %d %H:%M'),
+        'ts': t_start - 1,
+        'label': datetime.fromtimestamp(t_start - 1, tz=timezone.utc).strftime('%b %d %H:%M'),
         'total': deposit,
     })
 
-    for f in fills_sorted:
-        ts = f['ts']
-        cum_fees += float(f.get('fee_cost', 0))
-        progress = (ts - t_start) / t_range
-        pnl_t = gross_pnl * progress
-        total_t = round(deposit - cum_fees + pnl_t, 2)
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-        timeline.append({'ts': ts, 'label': dt.strftime('%b %d %H:%M'), 'total': total_t})
+    for ev in events:
+        if ev['type'] == 'fill':
+            if ev['action'] == 'buy':
+                cash -= ev['cost'] + ev['fee']
+                position_cost += ev['cost']
+            elif ev['action'] == 'sell':
+                cash += ev['cost'] - ev['fee']
+                position_cost -= ev['cost']
+                position_cost = max(0, position_cost)  # safety floor
+        elif ev['type'] == 'settlement':
+            # Settlement returns revenue to cash and removes cost basis
+            cash += ev['revenue']
+            position_cost -= ev['cost_returned']
+            position_cost = max(0, position_cost)
+            # Settlement fees are already deducted from revenue by Kalshi
 
-    # Final point anchored exactly to current API total
+        total = round(cash + position_cost, 2)
+        dt = datetime.fromtimestamp(ev['ts'], tz=timezone.utc)
+        timeline.append({
+            'ts': ev['ts'],
+            'label': dt.strftime('%b %d %H:%M'),
+            'total': total,
+        })
+
+    # Final point anchored to live API value
+    t_end = int(datetime.now(tz=timezone.utc).timestamp())
     timeline.append({
         'ts': t_end,
         'label': datetime.now(tz=timezone.utc).strftime('%b %d %H:%M'),
         'total': round(total_now, 2),
     })
 
-    # Deduplicate and downsample to ~300 points
+    # Deduplicate by timestamp (keep latest) and downsample to ~300 points
     seen = {}
     for t in timeline:
         seen[t['ts']] = t
@@ -153,9 +224,10 @@ def process_data(data):
     portfolio_value_usd = portfolio_value_cents / 100
     total_value_usd = balance_usd + portfolio_value_usd
 
-    # Build portfolio timeline
+    # Build portfolio timeline (using fills AND settlements for accurate reconstruction)
     all_fills = data['fills'].get('fills', [])
-    portfolio_timeline, deposit = build_portfolio_timeline(all_fills, balance_usd, portfolio_value_usd)
+    all_settlements = data.get('settlements', [])
+    portfolio_timeline, deposit = build_portfolio_timeline(all_fills, all_settlements, balance_usd, portfolio_value_usd)
 
     # Process event positions
     event_positions = data['positions'].get('event_positions', [])
