@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2 text-xs text-slate-400">
     <span class="live-dot"></span>
     <span class="text-green-400 font-semibold">LIVE TRADING</span>
-    <span class="ml-2">Updated: 2026-02-28 20:19:32 UTC</span>
+    <span class="ml-2">Updated: 2026-02-28 20:35:14 UTC</span>
   </div>
 </div>
 
@@ -48,22 +48,22 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Available Cash</div>
-    <div class="text-2xl font-bold text-white">$97.93</div>
+    <div class="text-2xl font-bold text-white">$101.26</div>
     <div class="text-xs text-slate-500 mt-1">Uninvested balance</div>
   </div>
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Portfolio Value</div>
-    <div class="text-2xl font-bold text-blue-400">$189.02</div>
+    <div class="text-2xl font-bold text-blue-400">$182.92</div>
     <div class="text-xs text-slate-500 mt-1">Open position value</div>
   </div>
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Total Account</div>
-    <div class="text-2xl font-bold text-white">$286.95</div>
+    <div class="text-2xl font-bold text-white">$284.18</div>
     <div class="text-xs text-slate-500 mt-1">Cash + positions</div>
   </div>
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Realized P&L</div>
-    <div class="text-2xl font-bold text-red-400">$-2.60</div>
+    <div class="text-2xl font-bold text-red-400">$-10.80</div>
     <div class="text-xs text-slate-500 mt-1">All closed trades</div>
   </div>
 </div>
@@ -72,11 +72,11 @@
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Open Positions</div>
-    <div class="text-xl font-bold text-white">14</div>
+    <div class="text-xl font-bold text-white">11</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Total Trades</div>
-    <div class="text-xl font-bold text-white">683</div>
+    <div class="text-xl font-bold text-white">688</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Win Rate</div>
@@ -84,11 +84,11 @@
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Total Exposure</div>
-    <div class="text-xl font-bold text-blue-400">$162.51</div>
+    <div class="text-xl font-bold text-blue-400">$150.71</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Fees Paid</div>
-    <div class="text-xl font-bold text-yellow-400">$3.78</div>
+    <div class="text-xl font-bold text-yellow-400">$4.05</div>
   </div>
 </div>
 
@@ -101,7 +101,7 @@
       <span><span style="display:inline-block;width:18px;height:2px;background:#94a3b8;border-top:2px dashed #94a3b8;vertical-align:middle;"></span> Deposited ($400)</span>
     </div>
   </div>
-  <div class="text-xs text-slate-500 mb-3">Reconstructed from 428 fill events · Feb 22 06:23 → now</div>
+  <div class="text-xs text-slate-500 mb-3">Reconstructed from 433 fill events · Feb 22 06:23 → now</div>
   <canvas id="portfolioChart" style="max-height:320px;"></canvas>
 </div>
 
@@ -120,8 +120,8 @@
     <canvas id="winLossChart"></canvas>
     <div class="flex justify-center gap-4 mt-2 text-xs">
       <span class="text-green-400">✓ 0 Profitable</span>
-      <span class="text-red-400">✗ 4 Loss</span>
-      <span class="text-slate-400">◎ 16 Open/Neutral</span>
+      <span class="text-red-400">✗ 6 Loss</span>
+      <span class="text-slate-400">◎ 14 Open/Neutral</span>
     </div>
   </div>
 
@@ -153,7 +153,7 @@
 <!-- Open Positions Table -->
 <div class="card p-4 mb-4">
   <div class="flex items-center justify-between mb-3">
-    <div class="text-sm font-semibold text-white">📋 Open Positions (14)</div>
+    <div class="text-sm font-semibold text-white">📋 Open Positions (11)</div>
     <span class="badge badge-blue">Live</span>
   </div>
   <div class="scrollable">
@@ -208,18 +208,6 @@
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-right text-white">$5.4000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$25.7000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">120</td>
-          <td class="py-2 pr-3 text-right text-red-400">$-0.30</td>
-          <td class="py-2 text-right text-yellow-400">$0.4500</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
             <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28lalgsw" target="_blank" rel="noopener"
                class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28LALGSW</a>
           </td>
@@ -256,18 +244,6 @@
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26jun" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26JUN</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-right text-white">$3.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$3.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">30</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.2400</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
             <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28porcha" target="_blank" rel="noopener"
                class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28PORCHA</a>
           </td>
@@ -277,18 +253,6 @@
           <td class="py-2 pr-3 text-right text-slate-300">10</td>
           <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
           <td class="py-2 text-right text-yellow-400">$0.1500</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26mar" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAR</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-right text-white">$2.8000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$13.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">50</td>
-          <td class="py-2 pr-3 text-right text-red-400">$-0.80</td>
-          <td class="py-2 text-right text-yellow-400">$0.2800</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
@@ -328,15 +292,15 @@
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26may" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAY</a>
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
           <td class="py-2 pr-3 text-right text-white">$1.1000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$1.1000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">10</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.0700</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$78.4000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">175</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-2.30</td>
+          <td class="py-2 text-right text-yellow-400">$0.6100</td>
         </tr>
       </tbody>
     </table>
@@ -364,6 +328,71 @@
         </tr>
       </thead>
       <tbody>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26may-t-0.1" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAY-T-0.1</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">10</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$99¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.01</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26mar-t-0.1" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAR-T-0.1</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">30</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$98¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.05</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26jun-t-0.1" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26JUN-T-0.1</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">30</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$98¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.05</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t0.1" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T0.1</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">30</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$94¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.12</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t0.0" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T0.0</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">25</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$98¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.04</td>
+        </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 text-slate-400">02/28 19:48</td>
           <td class="py-2 pr-3 font-mono text-xs">
@@ -559,71 +588,6 @@
           <td class="py-2 pr-3 text-right text-slate-300">$95¢</td>
           <td class="py-2 text-right text-yellow-400">$0.00</td>
         </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/27 20:04</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb27-b82.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB27-B82.5</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$95¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.00</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/27 20:04</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb27-b82.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB27-B82.5</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$95¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.00</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/27 20:03</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb27-b82.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB27-B82.5</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">3</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$94¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.01</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/27 20:03</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb27-b82.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB27-B82.5</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">2</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$94¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.01</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/27 20:03</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb27-b82.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB27-B82.5</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">3</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$94¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.02</td>
-        </tr>
       </tbody>
     </table>
   </div>
@@ -649,7 +613,7 @@
 </div>
 
 <div class="text-center text-xs text-slate-600 pb-4">
-  Kalshi AI Trading Bot Dashboard · Generated 2026-02-28 20:19:32 UTC · Data from Kalshi REST API
+  Kalshi AI Trading Bot Dashboard · Generated 2026-02-28 20:35:14 UTC · Data from Kalshi REST API
 </div>
 
 <script>
@@ -669,7 +633,7 @@ new Chart(document.getElementById('pnlChart'), {
     labels: ["Economics", "Weather", "NBA", "Politics", "Other"],
     datasets: [{
       label: 'Realized P&L ($)',
-      data: [-2.6, 0.0, 0.0, 0.0, 0.0],
+      data: [-10.8, 0.0, 0.0, 0.0, 0.0],
       backgroundColor: ["#ef4444", "#22c55e", "#22c55e", "#22c55e", "#22c55e"],
       borderRadius: 6,
     }]
@@ -690,7 +654,7 @@ new Chart(document.getElementById('winLossChart'), {
   data: {
     labels: ["Profitable", "Loss", "Neutral/Open"],
     datasets: [{
-      data: [0, 4, 16],
+      data: [0, 6, 14],
       backgroundColor: ["#22c55e", "#ef4444", "#94a3b8"],
       borderWidth: 0,
       hoverOffset: 6
@@ -711,7 +675,7 @@ new Chart(document.getElementById('exposureChart'), {
   data: {
     labels: ["Economics", "Weather", "NBA", "Politics", "Other"],
     datasets: [{
-      data: [17.2, 99.73, 7.6, 1.96, 36.02],
+      data: [5.4, 99.73, 7.6, 1.96, 36.02],
       backgroundColor: expColors.slice(0, 5),
       borderWidth: 0,
       hoverOffset: 6
@@ -729,10 +693,10 @@ new Chart(document.getElementById('exposureChart'), {
 new Chart(document.getElementById('volumeChart'), {
   type: 'bar',
   data: {
-    labels: ["Weather", "Economics", "Other", "NBA", "Politics"],
+    labels: ["Economics", "Weather", "Other", "NBA", "Politics"],
     datasets: [
-      { label: 'Buys', data: [606, 26, 16, 6, 1], backgroundColor: '#22c55e', borderRadius: 4 },
-      { label: 'Sells', data: [23, 5, 0, 0, 0], backgroundColor: '#ef4444', borderRadius: 4 }
+      { label: 'Buys', data: [26, 606, 16, 6, 1], backgroundColor: '#22c55e', borderRadius: 4 },
+      { label: 'Sells', data: [10, 23, 0, 0, 0], backgroundColor: '#ef4444', borderRadius: 4 }
     ]
   },
   options: {
@@ -752,7 +716,7 @@ new Chart(document.getElementById('hourlyChart'), {
     labels: ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"],
     datasets: [{
       label: 'Trades',
-      data: [9, 19, 2, 12, 11, 12, 8, 3, 6, 13, 7, 5, 0, 63, 27, 58, 36, 75, 72, 68, 83, 38, 46, 10],
+      data: [9, 19, 2, 12, 11, 12, 8, 3, 6, 13, 7, 5, 0, 63, 27, 58, 36, 75, 72, 68, 88, 38, 46, 10],
       backgroundColor: '#3b82f6',
       borderRadius: 3,
     }]
@@ -768,8 +732,8 @@ new Chart(document.getElementById('hourlyChart'), {
 });
 
 // 6. Portfolio Value Over Time — two lines only: total portfolio and deposit baseline
-const portfolioLabels = ["Feb 22 06:23", "Feb 22 09:40", "Feb 22 17:18", "Feb 22 17:18", "Feb 22 17:20", "Feb 22 17:21", "Feb 22 17:40", "Feb 22 17:40", "Feb 22 17:41", "Feb 22 17:50", "Feb 22 18:11", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 19:11", "Feb 22 19:11", "Feb 22 19:12", "Feb 22 19:15", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 20:12", "Feb 22 20:12", "Feb 22 20:12", "Feb 22 20:42", "Feb 22 20:42", "Feb 22 20:42", "Feb 22 21:12", "Feb 22 21:12", "Feb 22 21:12", "Feb 22 21:42", "Feb 22 21:42", "Feb 22 21:42", "Feb 22 22:12", "Feb 22 22:12", "Feb 22 23:59", "Feb 22 23:59", "Feb 22 23:59", "Feb 22 23:59", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:59", "Feb 23 00:59", "Feb 23 01:06", "Feb 23 01:29", "Feb 23 01:29", "Feb 23 01:42", "Feb 23 01:59", "Feb 23 01:59", "Feb 23 02:30", "Feb 23 02:30", "Feb 23 03:00", "Feb 23 03:00", "Feb 23 03:46", "Feb 23 03:46", "Feb 23 04:16", "Feb 23 04:46", "Feb 23 04:47", "Feb 23 04:51", "Feb 23 04:51", "Feb 23 05:23", "Feb 23 05:47", "Feb 23 05:52", "Feb 23 06:17", "Feb 23 06:17", "Feb 23 06:47", "Feb 23 07:07", "Feb 23 07:18", "Feb 23 07:48", "Feb 23 08:01", "Feb 23 08:02", "Feb 23 08:16", "Feb 23 08:16", "Feb 23 08:46", "Feb 23 08:46", "Feb 23 09:16", "Feb 23 09:16", "Feb 23 09:35", "Feb 23 09:47", "Feb 23 09:47", "Feb 23 10:13", "Feb 23 10:17", "Feb 23 10:17", "Feb 23 10:24", "Feb 23 10:47", "Feb 23 10:47", "Feb 23 11:17", "Feb 23 11:17", "Feb 23 11:48", "Feb 23 11:56", "Feb 23 11:58", "Feb 23 13:18", "Feb 23 13:18", "Feb 23 13:49", "Feb 23 13:49", "Feb 23 22:38", "Feb 23 22:38", "Feb 24 13:22", "Feb 24 13:33", "Feb 24 13:33", "Feb 24 14:03", "Feb 24 14:08", "Feb 24 14:34", "Feb 24 14:34", "Feb 24 15:04", "Feb 24 15:05", "Feb 24 15:34", "Feb 24 15:34", "Feb 24 15:34", "Feb 24 16:05", "Feb 24 16:05", "Feb 24 17:06", "Feb 24 17:06", "Feb 24 17:17", "Feb 24 17:17", "Feb 24 17:48", "Feb 24 17:48", "Feb 24 18:18", "Feb 24 18:18", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:23", "Feb 24 18:52", "Feb 24 18:52", "Feb 24 18:52", "Feb 24 18:53", "Feb 24 18:53", "Feb 24 19:01", "Feb 24 19:06", "Feb 24 19:09", "Feb 24 19:22", "Feb 24 19:22", "Feb 24 19:22", "Feb 24 19:23", "Feb 24 19:23", "Feb 24 19:25", "Feb 24 19:27", "Feb 24 19:28", "Feb 24 19:28", "Feb 24 19:52", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:54", "Feb 24 19:54", "Feb 24 20:02", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:53", "Feb 24 20:53", "Feb 24 20:53", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:42", "Feb 24 21:45", "Feb 24 22:13", "Feb 24 22:13", "Feb 24 22:13", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:45", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:19", "Feb 25 13:20", "Feb 25 13:22", "Feb 25 13:23", "Feb 25 13:23", "Feb 25 13:24", "Feb 25 13:24", "Feb 25 13:25", "Feb 25 13:27", "Feb 25 13:28", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:49", "Feb 25 13:53", "Feb 25 13:57", "Feb 25 13:58", "Feb 25 14:01", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:48", "Feb 25 14:48", "Feb 25 14:48", "Feb 25 15:19", "Feb 25 15:19", "Feb 25 15:19", "Feb 25 15:49", "Feb 25 15:49", "Feb 25 15:49", "Feb 25 16:19", "Feb 25 16:19", "Feb 25 16:20", "Feb 25 16:20", "Feb 25 16:30", "Feb 25 16:42", "Feb 25 16:42", "Feb 25 16:42", "Feb 25 16:56", "Feb 25 16:56", "Feb 25 17:53", "Feb 25 17:53", "Feb 25 17:53", "Feb 25 17:57", "Feb 25 18:23", "Feb 25 18:23", "Feb 25 18:24", "Feb 25 18:28", "Feb 25 18:39", "Feb 25 18:53", "Feb 25 18:54", "Feb 25 18:57", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:26", "Feb 25 19:54", "Feb 25 19:54", "Feb 25 19:55", "Feb 25 19:57", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:37", "Feb 25 20:53", "Feb 25 20:53", "Feb 25 20:53", "Feb 25 20:54", "Feb 25 20:54", "Feb 25 21:41", "Feb 25 21:41", "Feb 25 21:41", "Feb 25 22:11", "Feb 25 22:11", "Feb 25 22:11", "Feb 25 22:14", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:28", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 14:26", "Feb 26 15:27", "Feb 26 15:27", "Feb 26 15:27", "Feb 26 15:57", "Feb 26 16:06", "Feb 26 16:06", "Feb 26 16:30", "Feb 26 16:30", "Feb 26 16:37", "Feb 26 16:58", "Feb 26 16:58", "Feb 26 17:05", "Feb 26 17:05", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:53", "Feb 26 17:54", "Feb 26 18:24", "Feb 26 18:24", "Feb 26 18:54", "Feb 26 18:55", "Feb 26 19:24", "Feb 26 19:54", "Feb 26 19:55", "Feb 26 19:56", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:26", "Feb 26 20:27", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:30", "Feb 26 20:30", "Feb 26 20:39", "Feb 26 21:18", "Feb 26 21:18", "Feb 26 21:18", "Feb 26 21:48", "Feb 26 21:48", "Feb 26 21:48", "Feb 26 22:06", "Feb 26 22:13", "Feb 26 22:18", "Feb 26 22:18", "Feb 26 22:18", "Feb 26 22:19", "Feb 26 22:19", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 23:19", "Feb 26 23:38", "Feb 26 23:49", "Feb 26 23:49", "Feb 27 00:20", "Feb 27 00:20", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:06", "Feb 27 01:06", "Feb 27 01:06", "Feb 27 01:36", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:26", "Feb 27 03:26", "Feb 27 04:11", "Feb 27 06:06", "Feb 27 15:08", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:35", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:47", "Feb 27 15:49", "Feb 27 16:03", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:16", "Feb 27 17:18", "Feb 27 17:44", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:48", "Feb 27 17:50", "Feb 27 18:09", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:16", "Feb 27 18:16", "Feb 27 18:16", "Feb 27 18:18", "Feb 27 18:21", "Feb 27 18:21", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:46", "Feb 27 19:47", "Feb 27 19:47", "Feb 27 19:51", "Feb 27 20:00", "Feb 27 20:00", "Feb 27 20:03", "Feb 27 20:03", "Feb 27 20:04", "Feb 27 20:05", "Feb 27 20:09", "Feb 27 20:13", "Feb 27 20:23", "Feb 27 21:51", "Feb 28 06:10", "Feb 28 09:13", "Feb 28 19:45", "Feb 28 19:48", "Feb 28 20:19"];
-const portfolioTotal = [399.75, 398.25, 394.66, 394.54, 394.52, 394.49, 394.33, 394.32, 394.3, 394.24, 394.03, 393.67, 393.64, 393.62, 393.59, 393.59, 393.33, 393.29, 393.28, 393.26, 392.97, 392.94, 392.92, 392.89, 392.54, 392.52, 392.5, 392.12, 392.11, 392.08, 391.84, 391.71, 391.69, 391.35, 391.33, 391.31, 390.98, 390.94, 389.97, 389.94, 389.91, 389.84, 389.47, 389.44, 389.41, 389.35, 388.99, 388.96, 388.91, 388.61, 388.58, 388.48, 388.23, 388.2, 387.86, 387.83, 387.49, 387.48, 387.03, 387.01, 386.68, 386.35, 386.34, 386.31, 386.31, 386.06, 385.87, 385.83, 385.63, 385.61, 385.37, 385.22, 385.13, 384.89, 384.79, 384.78, 384.67, 384.66, 384.41, 384.37, 384.12, 384.08, 383.93, 383.83, 383.8, 383.6, 383.55, 383.53, 383.48, 383.28, 383.26, 383.01, 382.99, 382.74, 382.67, 382.65, 382.03, 382.01, 381.76, 381.74, 377.71, 377.71, 370.98, 370.87, 370.72, 370.34, 370.31, 370.09, 369.96, 369.51, 369.5, 369.24, 369.12, 369.06, 368.64, 368.58, 368.06, 367.83, 367.65, 367.55, 367.23, 367.13, 366.82, 366.78, 366.19, 366.0, 365.59, 365.59, 365.47, 364.93, 364.62, 364.41, 364.4, 364.4, 364.34, 364.3, 364.28, 363.94, 363.63, 363.27, 363.26, 363.26, 363.25, 363.23, 363.22, 363.22, 363.04, 362.8, 362.64, 362.16, 362.16, 362.16, 362.15, 362.1, 361.93, 361.62, 361.49, 361.39, 361.04, 360.79, 360.57, 360.18, 360.09, 359.92, 359.82, 359.82, 359.79, 359.45, 359.4, 359.26, 358.98, 358.9, 358.8, 358.8, 358.78, 350.79, 350.1, 349.33, 349.33, 349.32, 349.32, 349.29, 349.29, 349.29, 349.28, 349.28, 349.28, 349.26, 349.26, 348.41, 347.83, 347.55, 347.19, 347.19, 347.18, 347.15, 347.12, 347.12, 347.09, 346.56, 345.7, 344.8, 343.92, 342.75, 342.45, 341.45, 340.73, 340.24, 339.58, 339.16, 338.82, 338.69, 338.18, 337.99, 337.99, 337.98, 337.91, 337.69, 337.43, 337.26, 337.16, 337.16, 336.59, 336.34, 336.3, 336.26, 335.86, 335.78, 335.78, 335.75, 335.66, 335.39, 335.31, 335.29, 334.97, 334.89, 334.85, 334.85, 334.83, 334.54, 334.51, 334.51, 334.49, 334.26, 334.26, 334.22, 334.2, 334.1, 333.94, 333.91, 333.91, 333.91, 333.91, 333.53, 333.49, 333.44, 333.17, 333.15, 333.13, 333.11, 326.1, 325.82, 325.65, 325.61, 325.61, 325.59, 325.31, 325.31, 325.31, 325.31, 324.95, 324.36, 324.21, 324.05, 323.72, 323.5, 323.46, 323.28, 323.28, 322.89, 322.65, 322.54, 322.36, 322.08, 322.04, 321.95, 321.88, 321.81, 321.31, 321.31, 321.01, 321.01, 320.69, 320.69, 320.28, 320.0, 319.99, 319.99, 319.48, 319.31, 319.16, 319.16, 319.15, 319.14, 319.04, 318.88, 318.76, 318.6, 318.5, 318.41, 318.33, 318.33, 318.17, 318.17, 318.1, 317.57, 317.46, 317.46, 317.06, 316.91, 316.91, 316.78, 316.73, 316.55, 316.44, 316.4, 316.4, 316.4, 316.03, 316.01, 315.91, 315.91, 315.55, 315.41, 315.28, 315.2, 314.94, 314.85, 314.48, 314.28, 314.14, 313.86, 313.72, 313.58, 313.27, 312.88, 312.02, 312.0, 311.96, 311.95, 311.84, 311.77, 311.38, 310.51, 306.05, 306.02, 305.89, 305.82, 305.61, 305.45, 305.29, 305.11, 304.96, 304.78, 304.72, 304.53, 304.31, 303.96, 303.8, 303.76, 303.49, 303.43, 303.42, 303.31, 302.62, 302.57, 302.2, 302.07, 301.9, 301.89, 301.89, 301.89, 301.87, 301.31, 301.24, 301.06, 300.76, 300.63, 300.61, 300.6, 300.45, 299.69, 299.54, 299.5, 299.32, 299.23, 299.21, 299.21, 299.21, 299.2, 299.19, 299.17, 299.17, 298.51, 298.44, 298.37, 298.32, 298.28, 298.25, 298.24, 298.24, 298.23, 298.2, 298.13, 298.13, 298.08, 298.06, 298.05, 298.05, 298.02, 297.99, 297.91, 297.24, 293.44, 292.04, 287.21, 287.18, 286.95];
+const portfolioLabels = ["Feb 22 06:23", "Feb 22 09:40", "Feb 22 17:18", "Feb 22 17:18", "Feb 22 17:20", "Feb 22 17:21", "Feb 22 17:40", "Feb 22 17:40", "Feb 22 17:41", "Feb 22 17:50", "Feb 22 18:11", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 19:11", "Feb 22 19:11", "Feb 22 19:12", "Feb 22 19:15", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 20:12", "Feb 22 20:12", "Feb 22 20:12", "Feb 22 20:42", "Feb 22 20:42", "Feb 22 20:42", "Feb 22 21:12", "Feb 22 21:12", "Feb 22 21:12", "Feb 22 21:42", "Feb 22 21:42", "Feb 22 21:42", "Feb 22 22:12", "Feb 22 22:12", "Feb 22 23:59", "Feb 22 23:59", "Feb 22 23:59", "Feb 22 23:59", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:59", "Feb 23 00:59", "Feb 23 01:06", "Feb 23 01:29", "Feb 23 01:29", "Feb 23 01:42", "Feb 23 01:59", "Feb 23 01:59", "Feb 23 02:30", "Feb 23 02:30", "Feb 23 03:00", "Feb 23 03:00", "Feb 23 03:46", "Feb 23 03:46", "Feb 23 04:16", "Feb 23 04:46", "Feb 23 04:47", "Feb 23 04:51", "Feb 23 04:51", "Feb 23 05:23", "Feb 23 05:47", "Feb 23 05:52", "Feb 23 06:17", "Feb 23 06:17", "Feb 23 06:47", "Feb 23 07:07", "Feb 23 07:18", "Feb 23 07:48", "Feb 23 08:01", "Feb 23 08:02", "Feb 23 08:16", "Feb 23 08:16", "Feb 23 08:46", "Feb 23 08:46", "Feb 23 09:16", "Feb 23 09:16", "Feb 23 09:35", "Feb 23 09:47", "Feb 23 09:47", "Feb 23 10:13", "Feb 23 10:17", "Feb 23 10:17", "Feb 23 10:24", "Feb 23 10:47", "Feb 23 10:47", "Feb 23 11:17", "Feb 23 11:17", "Feb 23 11:48", "Feb 23 11:56", "Feb 23 11:58", "Feb 23 13:18", "Feb 23 13:18", "Feb 23 13:49", "Feb 23 13:49", "Feb 23 22:38", "Feb 23 22:38", "Feb 24 13:22", "Feb 24 13:33", "Feb 24 13:33", "Feb 24 14:03", "Feb 24 14:08", "Feb 24 14:34", "Feb 24 14:34", "Feb 24 15:04", "Feb 24 15:05", "Feb 24 15:34", "Feb 24 15:34", "Feb 24 15:34", "Feb 24 16:05", "Feb 24 16:05", "Feb 24 17:06", "Feb 24 17:06", "Feb 24 17:17", "Feb 24 17:17", "Feb 24 17:48", "Feb 24 17:48", "Feb 24 18:18", "Feb 24 18:18", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:23", "Feb 24 18:52", "Feb 24 18:52", "Feb 24 18:52", "Feb 24 18:53", "Feb 24 18:53", "Feb 24 19:01", "Feb 24 19:06", "Feb 24 19:09", "Feb 24 19:22", "Feb 24 19:22", "Feb 24 19:22", "Feb 24 19:23", "Feb 24 19:23", "Feb 24 19:25", "Feb 24 19:27", "Feb 24 19:28", "Feb 24 19:28", "Feb 24 19:52", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:54", "Feb 24 19:54", "Feb 24 20:02", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:53", "Feb 24 20:53", "Feb 24 20:53", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:42", "Feb 24 21:45", "Feb 24 22:13", "Feb 24 22:13", "Feb 24 22:13", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:45", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:19", "Feb 25 13:20", "Feb 25 13:22", "Feb 25 13:23", "Feb 25 13:23", "Feb 25 13:24", "Feb 25 13:24", "Feb 25 13:25", "Feb 25 13:27", "Feb 25 13:28", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:49", "Feb 25 13:53", "Feb 25 13:57", "Feb 25 13:58", "Feb 25 14:01", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:48", "Feb 25 14:48", "Feb 25 14:48", "Feb 25 15:19", "Feb 25 15:19", "Feb 25 15:19", "Feb 25 15:49", "Feb 25 15:49", "Feb 25 15:49", "Feb 25 16:19", "Feb 25 16:19", "Feb 25 16:20", "Feb 25 16:20", "Feb 25 16:30", "Feb 25 16:42", "Feb 25 16:42", "Feb 25 16:42", "Feb 25 16:56", "Feb 25 16:56", "Feb 25 17:53", "Feb 25 17:53", "Feb 25 17:53", "Feb 25 17:57", "Feb 25 18:23", "Feb 25 18:23", "Feb 25 18:24", "Feb 25 18:28", "Feb 25 18:39", "Feb 25 18:53", "Feb 25 18:54", "Feb 25 18:57", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:26", "Feb 25 19:54", "Feb 25 19:54", "Feb 25 19:55", "Feb 25 19:57", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:37", "Feb 25 20:53", "Feb 25 20:53", "Feb 25 20:53", "Feb 25 20:54", "Feb 25 20:54", "Feb 25 21:41", "Feb 25 21:41", "Feb 25 21:41", "Feb 25 22:11", "Feb 25 22:11", "Feb 25 22:11", "Feb 25 22:14", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:28", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 14:26", "Feb 26 15:27", "Feb 26 15:27", "Feb 26 15:27", "Feb 26 15:57", "Feb 26 16:06", "Feb 26 16:06", "Feb 26 16:30", "Feb 26 16:30", "Feb 26 16:37", "Feb 26 16:58", "Feb 26 16:58", "Feb 26 17:05", "Feb 26 17:05", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:53", "Feb 26 17:54", "Feb 26 18:24", "Feb 26 18:24", "Feb 26 18:54", "Feb 26 18:55", "Feb 26 19:24", "Feb 26 19:54", "Feb 26 19:55", "Feb 26 19:56", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:26", "Feb 26 20:27", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:30", "Feb 26 20:30", "Feb 26 20:39", "Feb 26 21:18", "Feb 26 21:18", "Feb 26 21:18", "Feb 26 21:48", "Feb 26 21:48", "Feb 26 21:48", "Feb 26 22:06", "Feb 26 22:13", "Feb 26 22:18", "Feb 26 22:18", "Feb 26 22:18", "Feb 26 22:19", "Feb 26 22:19", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 23:19", "Feb 26 23:38", "Feb 26 23:49", "Feb 26 23:49", "Feb 27 00:20", "Feb 27 00:20", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:06", "Feb 27 01:06", "Feb 27 01:06", "Feb 27 01:36", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:26", "Feb 27 03:26", "Feb 27 04:11", "Feb 27 06:06", "Feb 27 15:08", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:35", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:47", "Feb 27 15:49", "Feb 27 16:03", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:16", "Feb 27 17:18", "Feb 27 17:44", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:48", "Feb 27 17:50", "Feb 27 18:09", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:16", "Feb 27 18:16", "Feb 27 18:16", "Feb 27 18:18", "Feb 27 18:21", "Feb 27 18:21", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:46", "Feb 27 19:47", "Feb 27 19:47", "Feb 27 19:51", "Feb 27 20:00", "Feb 27 20:00", "Feb 27 20:03", "Feb 27 20:03", "Feb 27 20:04", "Feb 27 20:05", "Feb 27 20:09", "Feb 27 20:13", "Feb 27 20:23", "Feb 27 21:51", "Feb 28 06:10", "Feb 28 09:13", "Feb 28 19:45", "Feb 28 19:48", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:35"];
+const portfolioTotal = [399.75, 398.2, 394.5, 394.37, 394.35, 394.33, 394.16, 394.15, 394.13, 394.06, 393.85, 393.49, 393.46, 393.44, 393.41, 393.41, 393.14, 393.1, 393.09, 393.06, 392.77, 392.74, 392.72, 392.69, 392.33, 392.31, 392.29, 391.91, 391.9, 391.87, 391.62, 391.49, 391.47, 391.12, 391.1, 391.08, 390.74, 390.7, 389.71, 389.68, 389.65, 389.58, 389.2, 389.17, 389.14, 389.08, 388.71, 388.68, 388.63, 388.33, 388.3, 388.19, 387.94, 387.91, 387.56, 387.53, 387.18, 387.17, 386.71, 386.69, 386.35, 386.02, 386.01, 385.97, 385.97, 385.71, 385.52, 385.48, 385.27, 385.25, 385.0, 384.85, 384.76, 384.51, 384.41, 384.4, 384.28, 384.27, 384.01, 383.97, 383.71, 383.67, 383.52, 383.42, 383.39, 383.18, 383.13, 383.11, 383.05, 382.85, 382.83, 382.57, 382.55, 382.29, 382.23, 382.21, 381.56, 381.54, 381.28, 381.26, 377.1, 377.1, 370.15, 370.04, 369.89, 369.5, 369.47, 369.25, 369.12, 368.66, 368.65, 368.38, 368.26, 368.2, 367.77, 367.71, 367.18, 366.95, 366.76, 366.66, 366.33, 366.23, 365.91, 365.87, 365.28, 365.09, 364.68, 364.68, 364.57, 364.02, 363.71, 363.5, 363.49, 363.49, 363.43, 363.39, 363.36, 363.02, 362.71, 362.35, 362.34, 362.34, 362.33, 362.31, 362.3, 362.3, 362.11, 361.88, 361.72, 361.24, 361.23, 361.23, 361.23, 361.17, 361.0, 360.69, 360.56, 360.46, 360.1, 359.85, 359.63, 359.22, 359.13, 358.96, 358.86, 358.86, 358.83, 358.49, 358.44, 358.3, 358.01, 357.93, 357.83, 357.83, 357.82, 349.6, 348.91, 348.14, 348.14, 348.13, 348.13, 348.11, 348.1, 348.1, 348.09, 348.09, 348.09, 348.07, 348.07, 347.22, 346.64, 346.36, 346.0, 345.99, 345.99, 345.96, 345.92, 345.92, 345.89, 345.36, 344.5, 343.6, 342.72, 341.54, 341.24, 340.24, 339.51, 339.02, 338.36, 337.93, 337.59, 337.46, 336.94, 336.75, 336.75, 336.75, 336.67, 336.45, 336.19, 336.02, 335.92, 335.92, 335.33, 335.08, 335.04, 335.01, 334.59, 334.52, 334.52, 334.48, 334.4, 334.12, 334.04, 334.02, 333.69, 333.61, 333.57, 333.57, 333.55, 333.26, 333.23, 333.22, 333.2, 332.97, 332.97, 332.93, 332.91, 332.8, 332.64, 332.61, 332.61, 332.61, 332.61, 332.22, 332.18, 332.13, 331.85, 331.83, 331.81, 331.78, 324.55, 324.27, 324.1, 324.06, 324.06, 324.04, 323.75, 323.75, 323.75, 323.75, 323.38, 322.78, 322.63, 322.47, 322.13, 321.9, 321.86, 321.68, 321.68, 321.29, 321.04, 320.93, 320.75, 320.47, 320.44, 320.35, 320.28, 320.21, 319.69, 319.69, 319.39, 319.38, 319.06, 319.05, 318.64, 318.35, 318.34, 318.34, 317.83, 317.65, 317.5, 317.5, 317.5, 317.48, 317.38, 317.23, 317.11, 316.95, 316.84, 316.75, 316.67, 316.67, 316.52, 316.51, 316.44, 315.91, 315.8, 315.8, 315.39, 315.24, 315.24, 315.1, 315.05, 314.87, 314.76, 314.72, 314.72, 314.72, 314.34, 314.32, 314.22, 314.22, 313.85, 313.7, 313.58, 313.5, 313.23, 313.14, 312.75, 312.55, 312.41, 312.14, 311.99, 311.85, 311.54, 311.15, 310.26, 310.24, 310.2, 310.19, 310.08, 310.01, 309.61, 308.7, 304.11, 304.08, 303.96, 303.89, 303.68, 303.52, 303.36, 303.18, 303.02, 302.84, 302.78, 302.58, 302.37, 302.02, 301.86, 301.82, 301.55, 301.49, 301.47, 301.36, 300.65, 300.6, 300.23, 300.1, 299.93, 299.92, 299.92, 299.92, 299.9, 299.33, 299.27, 299.09, 298.79, 298.66, 298.64, 298.62, 298.47, 297.7, 297.56, 297.52, 297.34, 297.25, 297.23, 297.22, 297.22, 297.22, 297.21, 297.18, 297.18, 296.5, 296.43, 296.36, 296.31, 296.28, 296.25, 296.23, 296.23, 296.23, 296.19, 296.12, 296.12, 296.07, 296.05, 296.04, 296.03, 296.01, 295.97, 295.9, 295.2, 291.28, 289.83, 284.84, 284.81, 284.46, 284.34, 284.29, 284.24, 284.23, 284.18];
 const depositLine = new Array(portfolioLabels.length).fill(400.0);
 
 new Chart(document.getElementById('portfolioChart'), {
