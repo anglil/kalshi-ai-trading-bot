@@ -488,17 +488,21 @@ def generate_sports_signals(
         if entry_price_dollars <= 0:
             continue
 
+        # TURNAROUND v3: Minimum 30c price floor for sports too
+        if entry_price_cents < 30:
+            continue
+
         shares = max(1, int(position_size / entry_price_dollars))
-        shares = min(shares, 10)
+        shares = min(shares, 5)  # TURNAROUND v3: reduced from 10
         actual_position = shares * entry_price_dollars
 
         # Limit price
         if side == "YES":
             limit_price = min(entry_price_cents, int(our_prob * 100) - 1)
-            limit_price = max(1, limit_price)
+            limit_price = max(30, limit_price)  # TURNAROUND v3: 30c floor
         else:
             limit_price = min(entry_price_cents, int((1 - our_prob) * 100) - 1)
-            limit_price = max(1, limit_price)
+            limit_price = max(30, limit_price)  # TURNAROUND v3: 30c floor
 
         signal = SportsTradeSignal(
             market=mkt,

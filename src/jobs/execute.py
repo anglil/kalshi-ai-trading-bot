@@ -14,7 +14,7 @@ from src.utils.logging_setup import get_trading_logger
 from src.clients.kalshi_client import KalshiClient, KalshiAPIError
 
 # Maximum contracts allowed per single market ticker
-MAX_CONTRACTS_PER_MARKET = 30
+MAX_CONTRACTS_PER_MARKET = 10  # TURNAROUND v3: reduced from 30 to prevent over-concentration
 
 async def _check_existing_kalshi_position(kalshi_client: KalshiClient, ticker: str) -> dict:
     """
@@ -55,7 +55,7 @@ async def execute_position(
 
     if live_mode:
         # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
-        MIN_CASH_TO_TRADE = 10.0  # Don't trade if cash < $10
+        MIN_CASH_TO_TRADE = 50.0  # TURNAROUND v3: Don't trade if cash < $50 (preserve capital)
         try:
             bal_resp = await kalshi_client.get_balance()
             available_cash = bal_resp.get('balance', 0) / 100.0
@@ -109,7 +109,8 @@ async def execute_position(
             # Adding a small buffer (2c) to improve fill probability while
             # still acting as a maker order when possible.
             side_lower = position.side.lower()
-            limit_price_cents = min(95, max(2, int(position.entry_price * 100) + 2))
+            # TURNAROUND v3: Minimum 30c price floor (was 2c)
+            limit_price_cents = min(95, max(30, int(position.entry_price * 100) + 2))
             
             order_kwargs = {
                 "ticker": position.market_id,

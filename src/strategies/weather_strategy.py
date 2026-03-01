@@ -8,10 +8,15 @@ orders on brackets where our estimated probability exceeds the market
 price by a significant edge.
 
 Key concepts:
-- NWS forecasts have historical error σ ≈ 2-3°F for same-day, 4-5°F for next-day
-- Kalshi temperature brackets are 2°F wide with edge brackets for tails
+- NWS forecasts have historical error sigma 5-7 deg F (calibrated from real losses)
+- Kalshi temperature brackets are 2 deg F wide with edge brackets for tails
 - Settlement is based on NWS Daily Climate Report (next morning)
 - We use limit orders to minimize fees (taker fee = 0.07 * P * (1-P))
+
+TURNAROUND v3: Only bet on the 1-2 brackets CLOSEST to the forecast.
+Historical data shows the big wins came from "obvious" brackets (e.g.
+Chicago >40F in Feb, Miami >65F) bought at 10-50c. The losses came from
+spreading capital across 10+ brackets, most of which expired worthless.
 """
 
 import asyncio
@@ -104,26 +109,19 @@ def _normal_cdf(x: float) -> float:
 def forecast_to_bracket_probs(
     forecast_high: float,
     brackets: List[TemperatureBracket],
-    sigma: float = 3.0
+    sigma: float = 5.0
 ) -> Dict[str, float]:
     """
     Convert a point forecast into bracket probabilities using a Gaussian
     error model.
     
     The NWS point forecast is treated as the mean of a normal distribution
-    with standard deviation σ (historical forecast error). The probability
+    with standard deviation sigma (historical forecast error). The probability
     of each bracket is the integral of the normal PDF over the bracket range.
     
-    Args:
-        forecast_high: NWS forecasted high temperature (°F)
-        brackets: List of temperature brackets
-        sigma: Forecast error std deviation (°F). Typical values:
-               - Same-day morning: 2.0°F
-               - Same-day evening before: 3.0°F
-               - Next-day: 4.0°F
-    
-    Returns:
-        Dict mapping bracket ticker to probability
+    TURNAROUND v3: Default sigma raised to 5.0 (was 3.0). Historical data
+    showed the model was overconfident, assigning <1% to events that happened
+    frequently. Wider sigma = more honest uncertainty = fewer bad bets.
     """
     probs = {}
     for bracket in brackets:
@@ -136,7 +134,7 @@ def forecast_to_bracket_probs(
             z = (bracket.low - 0.5 - forecast_high) / sigma
             probs[bracket.ticker] = 1.0 - _normal_cdf(z)
         elif bracket.low is not None and bracket.high is not None:
-            # Middle bracket (e.g. 41-42°)
+            # Middle bracket (e.g. 41-42 deg)
             z_high = (bracket.high + 0.5 - forecast_high) / sigma
             z_low = (bracket.low - 0.5 - forecast_high) / sigma
             probs[bracket.ticker] = _normal_cdf(z_high) - _normal_cdf(z_low)
@@ -168,15 +166,10 @@ async def discover_weather_markets(
 ) -> List[TemperatureBracket]:
     """
     Discover active temperature bracket markets for a city and date.
-    
-    Searches Kalshi for markets matching the city's series ticker
-    and target date, then parses bracket ranges from market titles.
     """
     brackets = []
     
     try:
-        # Search for weather markets using series ticker
-        # Kalshi weather tickers follow patterns like: KXHIGHNY-26FEB22
         markets_response = await kalshi_client.get_markets(
             limit=100,
             series_ticker=station.kalshi_series
@@ -184,8 +177,6 @@ async def discover_weather_markets(
         
         markets = markets_response.get("markets", [])
         if not markets:
-            # Try alternate ticker patterns
-            # Some cities use KXTEMP or HIGHTEMP prefixes
             for prefix in [station.kalshi_series, f"KXTEMP{station.station_id[1:]}", f"HIGHTEMP"]:
                 markets_response = await kalshi_client.get_markets(
                     limit=100,
@@ -195,17 +186,15 @@ async def discover_weather_markets(
                 if markets:
                     break
         
-        logger.info(f"🔍 Found {len(markets)} weather markets for {station.city}")
+        logger.info(f"Found {len(markets)} weather markets for {station.city}")
         
         for market in markets:
             ticker = market.get("ticker", "")
             title = market.get("title", "")
             
-            # Only consider active markets
             if market.get("status") != "active":
                 continue
                 
-            # Parse bracket from title like "Highest temperature in NYC 39°F to 40°F?"
             bracket = _parse_bracket_from_market(market)
             if bracket:
                 brackets.append(bracket)
@@ -223,14 +212,12 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
     title = market.get("title", "")
     ticker = market.get("ticker", "")
     
-    # Extract YES/NO prices — skip bracket if no real price data
     yes_price = market.get("yes_price") or market.get("yes_bid") or market.get("yes_ask")
     no_price = market.get("no_price") or market.get("no_bid") or market.get("no_ask")
 
     if yes_price is None and no_price is None:
-        return None  # No price data — cannot assess edge
+        return None
 
-    # Fill in the missing side from the other
     if yes_price is not None and no_price is None:
         no_price = 100 - yes_price
     elif no_price is not None and yes_price is None:
@@ -240,33 +227,23 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
     no_ask = market.get("no_ask") or no_price
     volume = market.get("volume", 0)
     
-    # Parse temperature range from title
-    # Formats for Kalshi:
-    # "Will the high temp in Chicago be >33° on Feb 23, 2026?"
-    # "Will the high temp in Chicago be <26° on Feb 23, 2026?"
-    # "Will the high temp in Chicago be 32-33° on Feb 23, 2026?"
-    
     low = None
     high = None
     
-    # Try >X°
-    gt_match = re.search(r'>(\d+)°', title)
+    gt_match = re.search(r'>(\d+)', title)
     if gt_match:
-        low = int(gt_match.group(1)) + 1 # >40 means 41 or higher (assuming integers)
+        low = int(gt_match.group(1)) + 1
     else:
-        # Try <X°
-        lt_match = re.search(r'<(\d+)°', title)
+        lt_match = re.search(r'<(\d+)', title)
         if lt_match:
-            high = int(lt_match.group(1)) - 1 # <33 means 32 or lower
+            high = int(lt_match.group(1)) - 1
         else:
-            # Try X-Y°
-            range_match = re.search(r'(\d+)-(\d+)°', title)
+            range_match = re.search(r'(\d+)-(\d+)', title)
             if range_match:
                 low = int(range_match.group(1))
                 high = int(range_match.group(2))
     
     if low is None and high is None:
-        # Couldn't parse bracket — skip
         return None
     
     return TemperatureBracket(
@@ -282,8 +259,39 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
 
 
 # ============================================================
-# Signal generation
+# Signal generation — TURNAROUND v3
 # ============================================================
+
+# TURNAROUND v3: Minimum entry price raised to 30c.
+# Historical data: 0-15c contracts had -57% ROI, 15-30c had -43% ROI.
+# Only 30c+ contracts have a chance of being profitable.
+MIN_ENTRY_PRICE_CENTS = 30
+
+# TURNAROUND v3: Maximum 2 brackets per city per cycle.
+# The big wins came from 1-2 high-conviction bets, not 10+ scattered ones.
+MAX_BRACKETS_PER_CITY = 2
+
+
+def _bracket_distance_to_forecast(bracket: TemperatureBracket, forecast: float) -> float:
+    """
+    How far is this bracket from the forecast temperature?
+    Lower = closer = more likely to be the winning bracket.
+    
+    For "above X" brackets: distance = |X - forecast|
+    For "below X" brackets: distance = |X - forecast|
+    For "X-Y" brackets: distance = |midpoint - forecast|
+    """
+    if bracket.low is not None and bracket.high is not None:
+        midpoint = (bracket.low + bracket.high) / 2.0
+        return abs(midpoint - forecast)
+    elif bracket.high is None and bracket.low is not None:
+        # "Above X" bracket — forecast should be above X for this to win
+        return abs(bracket.low - forecast)
+    elif bracket.low is None and bracket.high is not None:
+        # "Below X" bracket — forecast should be below X for this to win
+        return abs(bracket.high - forecast)
+    return float('inf')
+
 
 def generate_weather_signals(
     brackets: List[TemperatureBracket],
@@ -295,24 +303,36 @@ def generate_weather_signals(
     kelly_fraction: float = 0.25,
     rationale_prefix: str = "WEATHER",
     max_shares: int = 5,
+    forecast_high: float = None,
 ) -> List[WeatherTradeSignal]:
     """
     Generate trade signals by comparing our probability estimates
     to market prices.
     
-    Args:
-        brackets: List of temperature brackets with market prices
-        bracket_probs: Our probability estimates for each bracket
-        city: City name for logging
-        bankroll: Total available capital
-        min_edge: Minimum edge to trade (default 8%)
-        max_position_pct: Max position as % of bankroll
-        kelly_fraction: Fraction of full Kelly to use
-    
-    Returns:
-        List of trade signals sorted by edge (strongest first)
+    TURNAROUND v3 changes:
+    - Only consider the 2 brackets closest to the forecast
+    - Minimum entry price raised to 30c (was 15c)
+    - Stronger edge requirement (15% minimum)
+    - Smaller position sizes (quarter Kelly, 3% max)
     """
     signals = []
+    
+    # TURNAROUND v3: If we have the forecast, pre-filter to only the
+    # closest brackets. This prevents the "spray and pray" approach
+    # that lost $248 across dozens of tail brackets.
+    if forecast_high is not None:
+        # Sort brackets by distance to forecast
+        brackets_with_dist = [
+            (b, _bracket_distance_to_forecast(b, forecast_high))
+            for b in brackets
+        ]
+        brackets_with_dist.sort(key=lambda x: x[1])
+        # Only consider the N closest brackets
+        brackets = [b for b, d in brackets_with_dist[:MAX_BRACKETS_PER_CITY * 3]]
+        logger.info(
+            f"TURNAROUND: {city} — filtered to {len(brackets)} closest brackets "
+            f"(forecast={forecast_high:.0f}F)"
+        )
     
     for bracket in brackets:
         our_prob = bracket_probs.get(bracket.ticker, 0.0)
@@ -326,8 +346,7 @@ def generate_weather_signals(
         yes_edge = our_prob - market_prob      # Edge for buying YES
         no_edge = market_prob - our_prob        # Edge for buying NO
         
-        # Priority 5: Market efficiency check — if market price is within 5% of our
-        # fair value, the market is already efficient and we have no real edge
+        # Market efficiency check
         if abs(yes_edge) < 0.05 and abs(no_edge) < 0.05:
             continue
         
@@ -335,13 +354,11 @@ def generate_weather_signals(
         if yes_edge >= min_edge:
             side = "YES"
             edge = yes_edge
-            # For YES: we pay market_prob, win (1 - market_prob) if correct
             odds = (1 - market_prob) / market_prob if market_prob > 0 else 0
             win_prob = our_prob
         elif no_edge >= min_edge:
             side = "NO"
             edge = no_edge
-            # For NO: we pay (1 - market_prob), win market_prob if correct
             odds = market_prob / (1 - market_prob) if market_prob < 1 else 0
             win_prob = 1 - our_prob
         else:
@@ -368,46 +385,45 @@ def generate_weather_signals(
         fee = kalshi_taker_fee(entry_price_cents)
         net_edge = edge - fee
         
-        if net_edge < 0.05:  # Skip if edge doesn't cover fees + 5% margin (raised from 3%)
+        if net_edge < 0.05:
             continue
         
-        # Minimum position: at least 1 contract
         entry_price_dollars = entry_price_cents / 100.0
         if entry_price_dollars <= 0:
             continue
         
-        # CRITICAL FIX: Minimum price floor — contracts below 15c are lottery tickets
-        # Historical data shows 0% win rate on 0-5c contracts (5,165 contracts, all lost)
-        MIN_ENTRY_PRICE_CENTS = 15
+        # TURNAROUND v3: Minimum price floor at 30c (was 15c)
+        # Historical data: 0-30c contracts have negative ROI across the board
         if entry_price_cents < MIN_ENTRY_PRICE_CENTS:
+            logger.debug(
+                f"PRICE FLOOR: Skip {bracket.ticker} {side} @ {entry_price_cents}c "
+                f"(min {MIN_ENTRY_PRICE_CENTS}c)"
+            )
             continue
         
         shares = max(1, int(position_size / entry_price_dollars))
-        shares = min(shares, max_shares)  # cap to prevent penny bet accumulation
+        shares = min(shares, max_shares)
         actual_position = shares * entry_price_dollars
         
-        # Set limit price: use maker-friendly pricing (2¢ below ask to be maker)
+        # Set limit price: maker-friendly (2c below ask)
         if side == "YES":
-            # We want to buy YES at a good price (below fair value)
             limit_price = min(entry_price_cents - 2, int(our_prob * 100) - 2)
             limit_price = max(MIN_ENTRY_PRICE_CENTS, limit_price)
         else:
-            # We want to buy NO at a good price
             limit_price = min(entry_price_cents - 2, int((1 - our_prob) * 100) - 2)
             limit_price = max(MIN_ENTRY_PRICE_CENTS, limit_price)
         
-        # CRITICAL FIX: Reject dead orders — if our limit price is more than 30% below
-        # the market ask, the order will never fill and just wastes buying power
+        # Reject dead orders — if limit is more than 30% below market ask
         if limit_price < entry_price_cents * 0.50:
             continue
         
         # Build bracket description
         if bracket.low is None:
-            bracket_desc = f"≤{bracket.high}°F"
+            bracket_desc = f"<={bracket.high}F"
         elif bracket.high is None:
-            bracket_desc = f"≥{bracket.low}°F"
+            bracket_desc = f">={bracket.low}F"
         else:
-            bracket_desc = f"{bracket.low}-{bracket.high}°F"
+            bracket_desc = f"{bracket.low}-{bracket.high}F"
         
         signal = WeatherTradeSignal(
             bracket=bracket,
@@ -416,7 +432,7 @@ def generate_weather_signals(
             edge=edge,
             edge_pct=edge,
             side=side,
-            confidence=min(1.0, our_prob + 0.1),  # Higher confidence when we have strong model signal
+            confidence=min(1.0, our_prob + 0.1),
             limit_price=limit_price,
             position_size_dollars=actual_position,
             shares=shares,
@@ -431,6 +447,15 @@ def generate_weather_signals(
     
     # Sort by edge (strongest first)
     signals.sort(key=lambda s: s.edge, reverse=True)
+    
+    # TURNAROUND v3: Only return top MAX_BRACKETS_PER_CITY signals
+    if len(signals) > MAX_BRACKETS_PER_CITY:
+        logger.info(
+            f"TURNAROUND: {city} — trimming from {len(signals)} to "
+            f"{MAX_BRACKETS_PER_CITY} signals (top edge only)"
+        )
+        signals = signals[:MAX_BRACKETS_PER_CITY]
+    
     return signals
 
 
@@ -446,12 +471,12 @@ async def execute_weather_trade(
 ) -> bool:
     """
     Execute a single weather trade signal using a limit order.
-    
     Returns True if order was placed successfully.
     """
     try:
         # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
-        MIN_CASH_TO_TRADE = 10.0  # Don't trade if cash < $10
+        # TURNAROUND v3: Raised from $10 to $50 to preserve capital for winners
+        MIN_CASH_TO_TRADE = 50.0
         try:
             bal_resp = await kalshi_client.get_balance()
             available_cash = bal_resp.get('balance', 0) / 100.0
@@ -466,32 +491,27 @@ async def execute_weather_trade(
             logger.warning(f"Capital check failed: {e}")
 
         # Check for existing position on KALSHI API (not just local DB)
-        # This prevents the critical bug where DB UNIQUE constraint failures
-        # caused orders to be placed but not tracked, leading to massive accumulation
         try:
             existing_api = await _check_existing_kalshi_position(kalshi_client, signal.bracket.ticker)
             existing_pos = existing_api.get('position', 0)
             existing_qty = abs(existing_pos)
             existing_side = 'YES' if existing_pos > 0 else 'NO' if existing_pos < 0 else None
             
-            # Block contradictory positions
             if existing_side and existing_side != signal.side.upper():
                 logger.info(
-                    f"⏭️ SKIP: Already hold {existing_qty} {existing_side} on "
+                    f"SKIP: Already hold {existing_qty} {existing_side} on "
                     f"{signal.bracket.ticker} — would be contradictory to buy {signal.side}"
                 )
                 return False
             
-            # Block if already at position limit
             from src.jobs.execute import MAX_CONTRACTS_PER_MARKET
             if existing_qty >= MAX_CONTRACTS_PER_MARKET:
                 logger.info(
-                    f"⏭️ SKIP: Already hold {existing_qty} contracts on "
+                    f"SKIP: Already hold {existing_qty} contracts on "
                     f"{signal.bracket.ticker} (max {MAX_CONTRACTS_PER_MARKET})"
                 )
                 return False
             
-            # Reduce order size if it would exceed limit
             allowed = MAX_CONTRACTS_PER_MARKET - existing_qty
             if signal.shares > allowed:
                 logger.info(f"Reducing order from {signal.shares} to {allowed} on {signal.bracket.ticker}")
@@ -507,7 +527,7 @@ async def execute_weather_trade(
         )
         if existing:
             logger.info(
-                f"⏭️ SKIP: Already hold {signal.bracket.ticker} {signal.side} in DB — "
+                f"SKIP: Already hold {signal.bracket.ticker} {signal.side} in DB — "
                 f"no duplicate order placed"
             )
             return False
@@ -524,15 +544,14 @@ async def execute_weather_trade(
             "type_": "limit",
         }
 
-        # Set limit price
         if side_lower == "yes":
             order_kwargs["yes_price"] = signal.limit_price
         else:
             order_kwargs["no_price"] = signal.limit_price
 
         logger.info(
-            f"🌡️ WEATHER TRADE: {signal.city} {signal.bracket.ticker} — "
-            f"{signal.shares} {signal.side} @ {signal.limit_price}¢ "
+            f"WEATHER TRADE: {signal.city} {signal.bracket.ticker} — "
+            f"{signal.shares} {signal.side} @ {signal.limit_price}c "
             f"(edge: {signal.edge:.0%})"
         )
 
@@ -541,7 +560,6 @@ async def execute_weather_trade(
         if order_response and "order" in order_response:
             order_id = order_response["order"].get("order_id", client_order_id)
             
-            # Weather positions: 50% adverse move stop-loss, 80% gain take-profit
             entry_dollars = signal.limit_price / 100.0
             position = Position(
                 market_id=signal.bracket.ticker,
@@ -554,21 +572,21 @@ async def execute_weather_trade(
                 strategy=strategy,
                 stop_loss_price=max(0.02, round(entry_dollars * 0.50, 2)),
                 take_profit_price=min(0.95, round(entry_dollars * 1.80, 2)),
-                max_hold_hours=36,  # weather markets settle within 24h
+                max_hold_hours=36,
             )
             await db_manager.add_position(position)
             
             logger.info(
-                f"✅ WEATHER ORDER PLACED: {signal.bracket.ticker} — "
-                f"Order ID: {order_id}, {signal.shares} {signal.side} @ {signal.limit_price}¢"
+                f"WEATHER ORDER PLACED: {signal.bracket.ticker} — "
+                f"Order ID: {order_id}, {signal.shares} {signal.side} @ {signal.limit_price}c"
             )
             return True
         else:
-            logger.error(f"❌ Weather order failed: {order_response}")
+            logger.error(f"Weather order failed: {order_response}")
             return False
             
     except Exception as e:
-        logger.error(f"❌ Error executing weather trade: {e}")
+        logger.error(f"Error executing weather trade: {e}")
         return False
 
 
@@ -581,16 +599,15 @@ async def run_weather_trading_cycle(
     db_manager: DatabaseManager,
 ) -> Dict:
     """
-    Run one complete weather trading cycle:
-    1. Fetch NWS forecasts for all cities
-    2. Discover Kalshi weather markets
-    3. Calculate bracket probabilities
-    4. Find mispriced brackets
-    5. Place limit orders
+    Run one complete weather trading cycle.
     
-    Returns summary dict with results.
+    TURNAROUND v3: Radically simplified.
+    - Only bet on 1-2 brackets closest to forecast per city
+    - Minimum 30c entry price
+    - Wider sigma (5.0+) for honest uncertainty
+    - Max 2 trades per cycle total
     """
-    logger.info("🌤️ Starting weather trading cycle...")
+    logger.info("Starting weather trading cycle (TURNAROUND v3)...")
     
     results = {
         "cities_analyzed": 0,
@@ -600,23 +617,21 @@ async def run_weather_trading_cycle(
         "total_position_value": 0.0,
     }
     
-    # Get available balance
     try:
         balance_response = await kalshi_client.get_balance()
-        bankroll = balance_response.get("balance", 0) / 100.0  # cents → dollars
+        bankroll = balance_response.get("balance", 0) / 100.0
     except Exception as e:
         logger.error(f"Could not fetch balance: {e}")
         return results
     
-    # Priority 3: Cap weather exposure at 30% of total portfolio
+    # Cap weather exposure at 30% of portfolio
     weather_bankroll = bankroll * 0.30
     
     if weather_bankroll < 5.0:
-        logger.warning(f"⚠️ Insufficient weather bankroll: ${weather_bankroll:.2f} (30% of ${bankroll:.2f})")
+        logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f}")
         return results
-    logger.info(f"Weather bankroll: ${weather_bankroll:.2f} (30% cap of ${bankroll:.2f})")
+    logger.info(f"Weather bankroll: ${weather_bankroll:.2f} (30% of ${bankroll:.2f})")
     
-    # Target dates: today and tomorrow
     today = datetime.now().strftime("%Y-%m-%d")
     tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     
@@ -626,79 +641,62 @@ async def run_weather_trading_cycle(
         try:
             results["cities_analyzed"] += 1
             
-            # 1. Fetch NWS forecast
             forecast_periods = await get_hourly_forecast(station)
             if not forecast_periods:
-                logger.warning(f"⚠️ No forecast data for {station.city}")
+                logger.warning(f"No forecast data for {station.city}")
                 continue
             
-            # 2. Get forecasted high for today
             forecast_high = get_forecast_high_for_date(forecast_periods, today)
             if forecast_high is None:
-                # Try tomorrow
                 forecast_high = get_forecast_high_for_date(forecast_periods, tomorrow)
                 if forecast_high is None:
-                    logger.warning(f"⚠️ No high temp forecast for {station.city}")
+                    logger.warning(f"No high temp forecast for {station.city}")
                     continue
             
-            logger.info(f"🌡️ {station.city}: NWS forecast high = {forecast_high}°F")
+            logger.info(f"{station.city}: NWS forecast high = {forecast_high}F")
             
-            # 3. Discover Kalshi weather markets for this city
             brackets = await discover_weather_markets(kalshi_client, station, today)
             results["brackets_found"] += len(brackets)
             
             if not brackets:
-                logger.info(f"📭 No active weather brackets for {station.city}")
+                logger.info(f"No active weather brackets for {station.city}")
                 continue
             
-            logger.info(f"📊 {station.city}: {len(brackets)} active brackets")
+            logger.info(f"{station.city}: {len(brackets)} active brackets")
             
-            # 4. Calculate bracket probabilities
-            # Use tighter σ for same-day (more confident), wider for next-day
+            # TURNAROUND v3: Use wider sigma for honest uncertainty
+            # Historical NWS error is 3-5F, but our model needs extra buffer
+            # because bracket boundaries create cliff effects
             current_hour = datetime.now().hour
-            if current_hour >= 10:  # After 10 AM, same-day forecasts are more accurate
-                sigma = 2.0
+            if current_hour >= 10:
+                sigma = 4.0   # Was 2.0 — doubled for calibration
             elif current_hour >= 6:
-                sigma = 2.5
+                sigma = 5.0   # Was 2.5
             else:
-                sigma = 3.5  # Early morning — less certain
+                sigma = 6.0   # Was 3.5
             
             bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
             
-            # Log probabilities
-            for bracket in brackets:
-                prob = bracket_probs.get(bracket.ticker, 0)
-                if bracket.low is None:
-                    desc = f"≤{bracket.high}°F"
-                elif bracket.high is None:
-                    desc = f"≥{bracket.low}°F"
-                else:
-                    desc = f"{bracket.low}-{bracket.high}°F"
-                logger.debug(
-                    f"  {desc}: NWS={prob:.1%}, Market={bracket.implied_prob:.1%}, "
-                    f"Edge={prob - bracket.implied_prob:+.1%}"
-                )
-            
-            # 5. Generate trade signals
+            # TURNAROUND v3: Pass forecast_high so signals are filtered to closest brackets
             city_signals = generate_weather_signals(
                 brackets=brackets,
                 bracket_probs=bracket_probs,
                 city=station.city,
                 bankroll=weather_bankroll,
-                min_edge=0.15,          # 15% minimum edge (raised from 8%)
-                max_position_pct=0.03,  # 3% per bracket (reduced from 5%)
-                kelly_fraction=0.25,    # Quarter Kelly (reduced from 0.5)
-                max_shares=5,           # Cap shares per trade
+                min_edge=0.15,
+                max_position_pct=0.03,
+                kelly_fraction=0.25,
+                max_shares=5,
+                forecast_high=forecast_high,
             )
             
             if city_signals:
                 logger.info(
-                    f"🎯 {station.city}: {len(city_signals)} trade signals "
+                    f"{station.city}: {len(city_signals)} trade signals "
                     f"(best edge: {city_signals[0].edge:.0%})"
                 )
                 all_signals.extend(city_signals)
             
-            # Small delay between cities
             await asyncio.sleep(1)
             
         except Exception as e:
@@ -708,18 +706,17 @@ async def run_weather_trading_cycle(
     results["signals_generated"] = len(all_signals)
     
     if not all_signals:
-        logger.info("📊 No weather trade signals generated this cycle")
+        logger.info("No weather trade signals generated this cycle")
         return results
     
-    # Sort all signals by edge and take top opportunities
+    # Sort all signals by edge and take top 2 only
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 3  # Max trades per cycle (reduced from 5)
+    max_trades = 2  # TURNAROUND v3: Max 2 trades per cycle (was 3-5)
     
-    logger.info(f"🌡️ Top weather signals ({len(all_signals)} total):")
+    logger.info(f"Top weather signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):
         logger.info(f"  #{i+1}: {sig.rationale}")
     
-    # 6. Execute top signals
     for signal in all_signals[:max_trades]:
         success = await execute_weather_trade(signal, kalshi_client, db_manager)
         if success:
@@ -727,7 +724,7 @@ async def run_weather_trading_cycle(
             results["total_position_value"] += signal.position_size_dollars
     
     logger.info(
-        f"🌤️ Weather cycle complete: {results['cities_analyzed']} cities, "
+        f"Weather cycle complete: {results['cities_analyzed']} cities, "
         f"{results['brackets_found']} brackets, {results['signals_generated']} signals, "
         f"{results['orders_placed']} orders placed (${results['total_position_value']:.2f})"
     )

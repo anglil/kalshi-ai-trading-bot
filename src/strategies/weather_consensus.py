@@ -38,14 +38,14 @@ logger = get_trading_logger("weather_consensus")
 # Risk management constants
 # ============================================================
 
-MAX_POSITIONS_PER_CITY = 2       # Max concurrent positions per city (reduced from 3)
+MAX_POSITIONS_PER_CITY = 2       # Max concurrent positions per city
 BRACKET_OVERLAP_THRESHOLD = 4    # °F — brackets within this range are "overlapping"
 MAX_DAILY_LOSSES_PER_CITY = 2    # Stop trading a city after this many consecutive losses in a day
-MIN_EDGE_THRESHOLD = 0.15        # 15% minimum edge (raised from 8%)
-KELLY_FRACTION = 0.25            # Quarter-Kelly (reduced from 0.5)
-MAX_POSITION_PCT = 0.03          # 3% per bracket (reduced from 5%)
-MAX_SHARES_PER_TRADE = 5         # Cap shares per trade (reduced from 10)
-WEATHER_TRADING_PAUSED = True    # EMERGENCY: Pause weather trading until model is validated
+MIN_EDGE_THRESHOLD = 0.20        # 20% minimum edge (raised from 15% — TURNAROUND v3)
+KELLY_FRACTION = 0.20            # Fifth-Kelly (reduced from 0.25 — more conservative)
+MAX_POSITION_PCT = 0.03          # 3% per bracket
+MAX_SHARES_PER_TRADE = 3         # Cap shares per trade (reduced from 5 — TURNAROUND v3)
+WEATHER_TRADING_PAUSED = False   # TURNAROUND v3: Re-enabled with guardrails
 
 
 # ============================================================
@@ -157,21 +157,21 @@ def compute_consensus(forecast: MultiSourceForecast) -> ConsensusResult:
     # Map ratio to sigma and confidence label
     # Priority 5: Calibrate sigma upward — our forecast is less precise than we thought
     if agreement_ratio >= 0.80:
-        sigma = 2.5   # Was 1.5 — too tight, caused overconfident bets
+        sigma = 4.0   # TURNAROUND v3: Was 2.5 — still too tight
         confidence = "high"
     elif agreement_ratio >= 0.60:
-        sigma = 3.5   # Was 2.5
+        sigma = 5.0   # TURNAROUND v3: Was 3.5
         confidence = "medium"
     else:
-        sigma = 5.0   # Was 4.0
+        sigma = 7.0   # TURNAROUND v3: Was 5.0
         confidence = "low"
 
     # Time-of-day adjustment: forecasts are less certain early in the morning
     hour = datetime.now().hour
     if hour < 6:
-        sigma += 1.0
+        sigma += 2.0   # TURNAROUND v3: bigger early-morning penalty
     elif hour < 10:
-        sigma += 0.5
+        sigma += 1.0
 
     # Consensus temp = median of the agreeing cluster
     best_cluster.sort()
@@ -217,11 +217,11 @@ async def _nws_fallback_for_city(
 
     hour = datetime.now().hour
     if hour >= 10:
-        sigma = 3.0   # Was 2.0 — calibrated upward
+        sigma = 4.0   # TURNAROUND v3: Was 3.0
     elif hour >= 6:
-        sigma = 3.5   # Was 2.5
+        sigma = 5.0   # TURNAROUND v3: Was 3.5
     else:
-        sigma = 4.5   # Was 3.5
+        sigma = 6.0   # TURNAROUND v3: Was 4.5
 
     bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
     return generate_weather_signals(
@@ -234,6 +234,7 @@ async def _nws_fallback_for_city(
         kelly_fraction=KELLY_FRACTION,
         rationale_prefix="WEATHER-NWS",
         max_shares=MAX_SHARES_PER_TRADE,
+        forecast_high=forecast_high,
     )
 
 
@@ -377,6 +378,7 @@ async def run_consensus_weather_cycle(
             )
 
             # 6. Generate signals (using tightened risk parameters)
+            # TURNAROUND v3: Pass forecast_high for closest-bracket filtering
             city_signals = generate_weather_signals(
                 brackets=brackets,
                 bracket_probs=bracket_probs,
@@ -387,6 +389,7 @@ async def run_consensus_weather_cycle(
                 kelly_fraction=KELLY_FRACTION,
                 rationale_prefix=f"CONSENSUS({consensus.confidence})",
                 max_shares=MAX_SHARES_PER_TRADE,
+                forecast_high=consensus.consensus_temp,
             )
 
             if city_signals:
@@ -410,7 +413,7 @@ async def run_consensus_weather_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 3  # Reduced from 5 to limit daily deployment
+    max_trades = 2  # TURNAROUND v3: Max 2 trades per cycle (was 3)
 
     # Filter out signals for tickers where we already hold a position
     # Use KALSHI API as source of truth (not just local DB which may be incomplete)

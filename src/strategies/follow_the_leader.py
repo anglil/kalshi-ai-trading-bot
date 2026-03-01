@@ -63,13 +63,13 @@ logger = get_trading_logger("follow_the_leader")
 MIN_EVENT_SPAN_HOURS   = 1.0     # only follow on low-frequency markets
 LARGE_TRADE_THRESHOLD  = 20      # min contracts per fill to count as "leader"
 LOOKBACK_MINUTES       = 60      # scan last 60 min of public trades
-TOP_N_LEADERS          = 100     # follow top 100 leader signals
-MIN_LEADER_SCORE       = 3.0     # minimum score to act on
-MAX_POSITION_DOLLARS   = 25.0    # max $ per follow-trade (increased from 15)
-KELLY_FRACTION         = 0.35    # slightly more aggressive Kelly for copy-trading (increased from 0.25)
-MIN_YES_PRICE          = 15      # cents — avoid near-zero markets (raised from 5)
-MAX_YES_PRICE          = 95      # cents — avoid near-certain markets
-MIN_VOLUME             = 50      # min total volume for a market to be liquid enough
+TOP_N_LEADERS          = 5       # TURNAROUND v3: follow top 5 only (was 100 — way too many)
+MIN_LEADER_SCORE       = 5.0     # TURNAROUND v3: raised from 3.0 (higher conviction required)
+MAX_POSITION_DOLLARS   = 10.0    # TURNAROUND v3: reduced from $25 (smaller bets)
+KELLY_FRACTION         = 0.20    # TURNAROUND v3: reduced from 0.35 (more conservative)
+MIN_YES_PRICE          = 30      # TURNAROUND v3: raised from 15c (no cheap lottery tickets)
+MAX_YES_PRICE          = 85      # TURNAROUND v3: reduced from 95c (avoid overpaying)
+MIN_VOLUME             = 100     # TURNAROUND v3: raised from 50 (more liquid markets only)
 CYCLE_INTERVAL_SECS    = 1800    # 30 minutes
 
 
@@ -497,7 +497,8 @@ async def _execute_leader_trade(
             return True
 
         # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
-        MIN_CASH_TO_TRADE = 10.0
+        # TURNAROUND v3: Raised from $10 to $50 to preserve capital for winners
+        MIN_CASH_TO_TRADE = 50.0
         try:
             bal_resp = await kalshi_client.get_balance()
             available_cash = bal_resp.get('balance', 0) / 100.0
