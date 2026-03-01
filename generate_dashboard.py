@@ -48,24 +48,37 @@ KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
 
 def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_now):
     """
-    Reconstruct a smooth portfolio value curve.
+    Reconstruct a high-fidelity portfolio value curve with a data point at
+    every fill and settlement event.
 
-    Approach: Use settlement net P&L as the only reliable data source.
-    portfolio_value(t) = deposit + cumulative_net_settlement_pnl(t) + unrealized(t)
-
-    At settlement points, net_pnl = revenue - cost is exact.
-    Between settlement batches, we linearly interpolate.
-    The final point uses the live API total (cash + portfolio_value).
-
-    This avoids the cash-replay inflation problem because we never
-    double-count: settlements already include the cost basis.
+    Approach: replay all cash flows (buys, sells, settlements, fees) to
+    reconstruct cash at every event. Estimate portfolio value as
+    cash + deployed_cost_basis. Apply a linear correction so the curve
+    starts at the known deposit and ends at the live API total.
+    This gives hundreds of granular data points showing every trade's impact.
     """
     from dateutil.parser import isoparse
     deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
 
-    # --- Step 1: Compute net P&L per settlement (revenue - cost) ---
-    settlement_pnl_events = []
+    # --- Step 1: Parse all events ---
+    all_events = []
+
+    for f in fills:
+        ts = f.get('ts', 0)
+        if ts == 0:
+            continue
+        count = f.get('count', 0)
+        price_cents = f.get('price', 0)
+        cost = (count * price_cents) / 100.0
+        fee_raw = float(f.get('fee_cost', 0))
+        fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
+        action = f.get('action', 'buy')
+        all_events.append({
+            'ts': ts, 'type': 'fill', 'action': action,
+            'cost': cost, 'fee': fee
+        })
+
     for s in settlements:
         settled_str = s.get('settled_time', '')
         try:
@@ -77,124 +90,89 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
         yes_cost = s.get('yes_total_cost', 0) / 100.0
         no_cost = s.get('no_total_cost', 0) / 100.0
         total_cost = yes_cost + no_cost
-        net_pnl = revenue - total_cost  # positive = profit, negative = loss
-        settlement_pnl_events.append({'ts': ts, 'net_pnl': net_pnl})
+        net_pnl = revenue - total_cost
+        all_events.append({
+            'ts': ts, 'type': 'settlement', 'net_pnl': net_pnl,
+            'cost_returned': total_cost
+        })
 
-    # --- Step 2: Compute cumulative fees from fills ---
-    fill_events = []
-    for f in fills:
-        ts = f.get('ts', 0)
-        if ts == 0:
-            continue
-        fee_raw = float(f.get('fee_cost', 0))
-        fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
-        if fee > 0:
-            fill_events.append({'ts': ts, 'fee': fee})
-
-    if not settlement_pnl_events and not fill_events:
+    if not all_events:
         return [{'ts': 0, 'label': 'Now', 'total': total_now}], deposit
 
-    # --- Step 3: Build anchor points ---
-    # Group settlements into batches (within 1 hour of each other)
-    settlement_pnl_events.sort(key=lambda x: x['ts'])
-    fill_events.sort(key=lambda x: x['ts'])
+    # Sort: settlements before fills at the same timestamp
+    all_events.sort(key=lambda x: (x['ts'], 0 if x['type'] == 'settlement' else 1))
 
-    # Compute cumulative settlement P&L over time
-    cum_pnl = 0.0
-    cum_fees = 0.0
-    all_ts = set()
+    # --- Step 2: Replay all events ---
+    cash = deposit
+    deployed = 0.0  # cost basis of unsettled positions
 
-    # Merge all events chronologically
-    all_events = []
-    for s in settlement_pnl_events:
-        all_events.append({'ts': s['ts'], 'type': 'settlement', 'net_pnl': s['net_pnl']})
-    for f in fill_events:
-        all_events.append({'ts': f['ts'], 'type': 'fee', 'fee': f['fee']})
-    all_events.sort(key=lambda x: x['ts'])
-
-    # Build raw timeline: deposit + cum_settlement_pnl - cum_fees
-    t_start = all_events[0]['ts'] if all_events else int(datetime.now(tz=timezone.utc).timestamp())
+    t_start = all_events[0]['ts']
     t_end = int(datetime.now(tz=timezone.utc).timestamp())
 
     raw_points = []
     raw_points.append({'ts': t_start - 3600, 'total': deposit})
 
-    cum_pnl = 0.0
-    cum_fees = 0.0
     for ev in all_events:
-        if ev['type'] == 'settlement':
-            cum_pnl += ev['net_pnl']
-        elif ev['type'] == 'fee':
-            cum_fees += ev['fee']
-        realized = deposit + cum_pnl - cum_fees
-        raw_points.append({'ts': ev['ts'], 'total': round(realized, 2)})
-
-    # The realized value at the end (after all settlements and fees)
-    final_realized = deposit + cum_pnl - cum_fees
-
-    # --- Step 4: Create settlement-batch anchors for smooth interpolation ---
-    # Group settlements into daily batches
-    settlement_times = sorted(set(s['ts'] for s in settlement_pnl_events))
-    batch_boundaries = []
-    if settlement_times:
-        batch_end = settlement_times[0]
-        for i in range(1, len(settlement_times)):
-            if settlement_times[i] - settlement_times[i-1] > 7200:  # 2 hour gap = new batch
-                batch_boundaries.append(batch_end)
-                batch_end = settlement_times[i]
+        if ev['type'] == 'fill':
+            cash -= ev['fee']
+            if ev['action'] == 'buy':
+                cash -= ev['cost']
+                deployed += ev['cost']
             else:
-                batch_end = settlement_times[i]
-        batch_boundaries.append(batch_end)
+                cash += ev['cost']
+                deployed = max(0, deployed - ev['cost'])
+        elif ev['type'] == 'settlement':
+            # Revenue = net_pnl + cost_returned
+            revenue = ev['net_pnl'] + ev['cost_returned']
+            cash += revenue
+            deployed = max(0, deployed - ev['cost_returned'])
 
-    # Build anchors: start, after each settlement batch, end
-    anchors = [{'ts': t_start - 3600, 'total': deposit}]
+        estimated = cash + deployed
+        raw_points.append({'ts': ev['ts'], 'total': round(estimated, 2)})
 
-    # Find the realized value right after each batch
-    for batch_ts in batch_boundaries:
-        # Find the last raw_point at or before this batch
-        batch_total = deposit
-        for rp in raw_points:
-            if rp['ts'] <= batch_ts + 60:
-                batch_total = rp['total']
-        anchors.append({'ts': batch_ts, 'total': batch_total})
+    # Add final API anchor
+    raw_points.append({'ts': t_end, 'total': round(total_now, 2)})
 
-    # Final anchor: current API total (includes unrealized position value)
-    anchors.append({'ts': t_end, 'total': round(total_now, 2)})
+    # --- Step 3: Apply linear correction ---
+    # The raw curve may drift because cost_basis != market_value.
+    # Correct so start = deposit and end = total_now.
+    if len(raw_points) >= 2:
+        raw_end = raw_points[-2]['total']  # last computed point (before API anchor)
+        end_error = total_now - raw_end
+        total_span = raw_points[-1]['ts'] - raw_points[0]['ts']
+        if total_span > 0:
+            for rp in raw_points[:-1]:  # don't adjust the API anchor
+                frac = (rp['ts'] - raw_points[0]['ts']) / total_span
+                rp['total'] = round(rp['total'] + frac * end_error, 2)
 
-    # Deduplicate
-    seen_ts = {}
-    for a in anchors:
-        seen_ts[a['ts']] = a
-    anchors = sorted(seen_ts.values(), key=lambda x: x['ts'])
+    # --- Step 4: Deduplicate timestamps ---
+    seen = {}
+    for rp in raw_points:
+        seen[rp['ts']] = rp
+    raw_points = sorted(seen.values(), key=lambda x: x['ts'])
 
-    # --- Step 5: Interpolate between anchors for a smooth 200-point curve ---
-    num_points = 200
+    # Thin to max 500 points if needed
+    MAX_POINTS = 500
+    if len(raw_points) > MAX_POINTS:
+        step = len(raw_points) / MAX_POINTS
+        thinned = [raw_points[0]]
+        for i in range(1, MAX_POINTS - 1):
+            idx = int(i * step)
+            if idx < len(raw_points):
+                thinned.append(raw_points[idx])
+        thinned.append(raw_points[-1])
+        raw_points = thinned
+
+    # --- Step 5: Format output ---
     timeline = []
-
-    for i in range(num_points):
-        frac = i / (num_points - 1)
-        ts = int(anchors[0]['ts'] + frac * (anchors[-1]['ts'] - anchors[0]['ts']))
-
-        # Find which anchor segment we're in
-        total = anchors[-1]['total']
-        for j in range(len(anchors) - 1):
-            if anchors[j]['ts'] <= ts <= anchors[j+1]['ts']:
-                seg_len = anchors[j+1]['ts'] - anchors[j]['ts']
-                if seg_len > 0:
-                    seg_frac = (ts - anchors[j]['ts']) / seg_len
-                    total = anchors[j]['total'] + seg_frac * (anchors[j+1]['total'] - anchors[j]['total'])
-                else:
-                    total = anchors[j+1]['total']
-                break
-
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    for rp in raw_points:
+        dt = datetime.fromtimestamp(rp['ts'], tz=timezone.utc)
         timeline.append({
-            'ts': ts,
+            'ts': rp['ts'],
             'label': dt.strftime('%b %d %H:%M'),
-            'total': round(total, 2),
+            'total': rp['total'],
         })
 
-    # Ensure exact final value
     if timeline:
         timeline[-1]['total'] = round(total_now, 2)
         timeline[-1]['label'] = datetime.now(tz=timezone.utc).strftime('%b %d %H:%M')
