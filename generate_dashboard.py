@@ -48,25 +48,24 @@ KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
 
 def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_now):
     """
-    Reconstruct portfolio value over time using settlement-anchored checkpoints.
+    Reconstruct a smooth portfolio value curve.
 
-    The key insight: we can only know the TRUE portfolio value at two types of moments:
-      1. The very start (deposit = $400)
-      2. The current moment (from the API: cash + portfolio_value)
+    Approach: Use settlement net P&L as the only reliable data source.
+    portfolio_value(t) = deposit + cumulative_net_settlement_pnl(t) + unrealized(t)
 
-    Between these, settlements give us "cash recovered" events that let us track
-    the realized portion. We use: total = deposit + cumulative_net_settlements - cumulative_fees
-    at settlement points, then interpolate to the current API value.
+    At settlement points, net_pnl = revenue - cost is exact.
+    Between settlement batches, we linearly interpolate.
+    The final point uses the live API total (cash + portfolio_value).
 
-    This avoids the cost-basis inflation problem entirely.
+    This avoids the cash-replay inflation problem because we never
+    double-count: settlements already include the cost basis.
     """
     from dateutil.parser import isoparse
     deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
 
-    # Step 1: Build settlement checkpoints — these are moments where we know
-    # the exact realized P&L (revenue - cost) for settled positions.
-    settlement_events = []
+    # --- Step 1: Compute net P&L per settlement (revenue - cost) ---
+    settlement_pnl_events = []
     for s in settlements:
         settled_str = s.get('settled_time', '')
         try:
@@ -79,75 +78,126 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
         no_cost = s.get('no_total_cost', 0) / 100.0
         total_cost = yes_cost + no_cost
         net_pnl = revenue - total_cost  # positive = profit, negative = loss
-        settlement_events.append({'ts': ts, 'net_pnl': net_pnl})
+        settlement_pnl_events.append({'ts': ts, 'net_pnl': net_pnl})
 
-    # Step 2: Also track fees from fills
-    fill_fees = []
+    # --- Step 2: Compute cumulative fees from fills ---
+    fill_events = []
     for f in fills:
         ts = f.get('ts', 0)
-        fee = float(f.get('fee_cost', 0))
-        fill_fees.append({'ts': ts, 'fee': fee})
+        if ts == 0:
+            continue
+        fee_raw = float(f.get('fee_cost', 0))
+        fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
+        if fee > 0:
+            fill_events.append({'ts': ts, 'fee': fee})
 
-    # Step 3: Merge all events chronologically
-    all_events = []
-    for se in settlement_events:
-        all_events.append({'ts': se['ts'], 'type': 'settlement', 'net_pnl': se['net_pnl']})
-    for ff in fill_fees:
-        all_events.append({'ts': ff['ts'], 'type': 'fee', 'fee': ff['fee']})
-    all_events.sort(key=lambda x: x['ts'])
-
-    if not all_events:
+    if not settlement_pnl_events and not fill_events:
         return [{'ts': 0, 'label': 'Now', 'total': total_now}], deposit
 
-    # Step 4: Build the realized value curve.
-    # realized_value = deposit + cumulative(settlement_net_pnl) - cumulative(fees)
-    # This is 100% accurate at every settlement point.
-    # The final point is the live API total (cash + portfolio_value) which
-    # includes unrealized position value.
-    realized_value = deposit
-    timeline = []
-    t_start = all_events[0]['ts']
+    # --- Step 3: Build anchor points ---
+    # Group settlements into batches (within 1 hour of each other)
+    settlement_pnl_events.sort(key=lambda x: x['ts'])
+    fill_events.sort(key=lambda x: x['ts'])
+
+    # Compute cumulative settlement P&L over time
+    cum_pnl = 0.0
+    cum_fees = 0.0
+    all_ts = set()
+
+    # Merge all events chronologically
+    all_events = []
+    for s in settlement_pnl_events:
+        all_events.append({'ts': s['ts'], 'type': 'settlement', 'net_pnl': s['net_pnl']})
+    for f in fill_events:
+        all_events.append({'ts': f['ts'], 'type': 'fee', 'fee': f['fee']})
+    all_events.sort(key=lambda x: x['ts'])
+
+    # Build raw timeline: deposit + cum_settlement_pnl - cum_fees
+    t_start = all_events[0]['ts'] if all_events else int(datetime.now(tz=timezone.utc).timestamp())
     t_end = int(datetime.now(tz=timezone.utc).timestamp())
 
-    timeline.append({
-        'ts': t_start - 1,
-        'label': datetime.fromtimestamp(t_start - 1, tz=timezone.utc).strftime('%b %d %H:%M'),
-        'total': deposit,
-    })
+    raw_points = []
+    raw_points.append({'ts': t_start - 3600, 'total': deposit})
 
+    cum_pnl = 0.0
+    cum_fees = 0.0
     for ev in all_events:
         if ev['type'] == 'settlement':
-            realized_value += ev['net_pnl']
+            cum_pnl += ev['net_pnl']
         elif ev['type'] == 'fee':
-            realized_value -= ev['fee']
+            cum_fees += ev['fee']
+        realized = deposit + cum_pnl - cum_fees
+        raw_points.append({'ts': ev['ts'], 'total': round(realized, 2)})
 
-        dt = datetime.fromtimestamp(ev['ts'], tz=timezone.utc)
+    # The realized value at the end (after all settlements and fees)
+    final_realized = deposit + cum_pnl - cum_fees
+
+    # --- Step 4: Create settlement-batch anchors for smooth interpolation ---
+    # Group settlements into daily batches
+    settlement_times = sorted(set(s['ts'] for s in settlement_pnl_events))
+    batch_boundaries = []
+    if settlement_times:
+        batch_end = settlement_times[0]
+        for i in range(1, len(settlement_times)):
+            if settlement_times[i] - settlement_times[i-1] > 7200:  # 2 hour gap = new batch
+                batch_boundaries.append(batch_end)
+                batch_end = settlement_times[i]
+            else:
+                batch_end = settlement_times[i]
+        batch_boundaries.append(batch_end)
+
+    # Build anchors: start, after each settlement batch, end
+    anchors = [{'ts': t_start - 3600, 'total': deposit}]
+
+    # Find the realized value right after each batch
+    for batch_ts in batch_boundaries:
+        # Find the last raw_point at or before this batch
+        batch_total = deposit
+        for rp in raw_points:
+            if rp['ts'] <= batch_ts + 60:
+                batch_total = rp['total']
+        anchors.append({'ts': batch_ts, 'total': batch_total})
+
+    # Final anchor: current API total (includes unrealized position value)
+    anchors.append({'ts': t_end, 'total': round(total_now, 2)})
+
+    # Deduplicate
+    seen_ts = {}
+    for a in anchors:
+        seen_ts[a['ts']] = a
+    anchors = sorted(seen_ts.values(), key=lambda x: x['ts'])
+
+    # --- Step 5: Interpolate between anchors for a smooth 200-point curve ---
+    num_points = 200
+    timeline = []
+
+    for i in range(num_points):
+        frac = i / (num_points - 1)
+        ts = int(anchors[0]['ts'] + frac * (anchors[-1]['ts'] - anchors[0]['ts']))
+
+        # Find which anchor segment we're in
+        total = anchors[-1]['total']
+        for j in range(len(anchors) - 1):
+            if anchors[j]['ts'] <= ts <= anchors[j+1]['ts']:
+                seg_len = anchors[j+1]['ts'] - anchors[j]['ts']
+                if seg_len > 0:
+                    seg_frac = (ts - anchors[j]['ts']) / seg_len
+                    total = anchors[j]['total'] + seg_frac * (anchors[j+1]['total'] - anchors[j]['total'])
+                else:
+                    total = anchors[j+1]['total']
+                break
+
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
         timeline.append({
-            'ts': ev['ts'],
+            'ts': ts,
             'label': dt.strftime('%b %d %H:%M'),
-            'total': round(realized_value, 2),
+            'total': round(total, 2),
         })
 
-    # Final point: live API total (includes unrealized position value)
-    # This may jump up from the realized curve because open positions
-    # have mark-to-market value not yet reflected in settlements.
-    timeline.append({
-        'ts': t_end,
-        'label': datetime.now(tz=timezone.utc).strftime('%b %d %H:%M'),
-        'total': round(total_now, 2),
-    })
-
-    # Deduplicate by timestamp (keep latest) and downsample to ~300 points
-    seen = {}
-    for t in timeline:
-        seen[t['ts']] = t
-    timeline = sorted(seen.values(), key=lambda x: x['ts'])
-    if len(timeline) > 300:
-        step = max(1, len(timeline) // 300)
-        sampled = timeline[::step]
-        if sampled[-1]['ts'] != timeline[-1]['ts']:
-            sampled.append(timeline[-1])
-        timeline = sampled
+    # Ensure exact final value
+    if timeline:
+        timeline[-1]['total'] = round(total_now, 2)
+        timeline[-1]['label'] = datetime.now(tz=timezone.utc).strftime('%b %d %H:%M')
 
     return timeline, deposit
 
