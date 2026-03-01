@@ -38,14 +38,14 @@ logger = get_trading_logger("weather_consensus")
 # Risk management constants
 # ============================================================
 
-MAX_POSITIONS_PER_CITY = 2       # Max concurrent positions per city
+MAX_POSITIONS_PER_CITY = 3       # DOUBLE DOWN: increased from 2 (weather is our top earner)
 BRACKET_OVERLAP_THRESHOLD = 4    # °F — brackets within this range are "overlapping"
-MAX_DAILY_LOSSES_PER_CITY = 2    # Stop trading a city after this many consecutive losses in a day
-MIN_EDGE_THRESHOLD = 0.20        # 20% minimum edge (raised from 15% — TURNAROUND v3)
-KELLY_FRACTION = 0.20            # Fifth-Kelly (reduced from 0.25 — more conservative)
-MAX_POSITION_PCT = 0.03          # 3% per bracket
-MAX_SHARES_PER_TRADE = 3         # Cap shares per trade (reduced from 5 — TURNAROUND v3)
-WEATHER_TRADING_PAUSED = False   # TURNAROUND v3: Re-enabled with guardrails
+MAX_DAILY_LOSSES_PER_CITY = 3    # DOUBLE DOWN: increased from 2 (allow more attempts)
+MIN_EDGE_THRESHOLD = 0.12        # DOUBLE DOWN: lowered from 20% to 12% (more trades qualify)
+KELLY_FRACTION = 0.30            # DOUBLE DOWN: increased from 0.20 (bigger bets on winners)
+MAX_POSITION_PCT = 0.05          # DOUBLE DOWN: increased from 3% to 5% per bracket
+MAX_SHARES_PER_TRADE = 8         # DOUBLE DOWN: increased from 3 to 8 (bigger positions)
+WEATHER_TRADING_PAUSED = False   # Active — weather is our #1 profit driver
 
 
 # ============================================================
@@ -286,7 +286,7 @@ async def run_consensus_weather_cycle(
         return results
 
     # Priority 3: Cap weather exposure at 30% of total portfolio
-    WEATHER_EXPOSURE_CAP = 0.30  # Max 30% of portfolio for weather
+    WEATHER_EXPOSURE_CAP = 0.50  # DOUBLE DOWN: Max 50% of portfolio for weather (was 30%)
     DAILY_DEPLOYMENT_LIMIT = 50.0  # Max $50/day in new weather buys
     
     # Check ACTUAL weather exposure from Kalshi API (not just bankroll calculation)
@@ -413,7 +413,7 @@ async def run_consensus_weather_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 2  # TURNAROUND v3: Max 2 trades per cycle (was 3)
+    max_trades = 4  # DOUBLE DOWN: Max 4 trades per cycle (was 2) — weather is our top earner
 
     # Filter out signals for tickers where we already hold a position
     # Use KALSHI API as source of truth (not just local DB which may be incomplete)

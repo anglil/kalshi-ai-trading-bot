@@ -404,8 +404,8 @@ class BeastModeBot:
                     )
                 else:
                     self.logger.info(f"📊 Weather Cycle #{cycle}: No trades this cycle")
-                # Run every 60 minutes (slowed from 30 min to reduce weather dominance)
-                await asyncio.sleep(3600)
+                # DOUBLE DOWN: Run every 30 minutes (was 60min) — weather is our top earner
+                await asyncio.sleep(1800)
             except Exception as e:
                 self.logger.error(f"Error in weather trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
@@ -522,8 +522,8 @@ class BeastModeBot:
                     )
                 else:
                     self.logger.info(f"NBA Cycle #{cycle}: No trades this cycle")
-                # Run every 30 minutes
-                await asyncio.sleep(1800)
+                # DOUBLE DOWN: Run every 15 minutes (was 30min) — NBA is our only positive-ROI strategy
+                await asyncio.sleep(900)
             except Exception as e:
                 self.logger.error(f"Error in NBA trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)

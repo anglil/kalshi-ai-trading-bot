@@ -231,14 +231,15 @@ async def run_nba_consensus_cycle(
 
         # Generate signals
         game_desc = f"{forecast.away_team}@{forecast.home_team}"
+        # DOUBLE DOWN: NBA is our only positive-ROI strategy (+7.2%)
         signals = generate_sports_signals(
             outcomes=outcomes,
             consensus=consensus,
             game_desc=game_desc,
             bankroll=bankroll,
-            min_edge=0.08,
-            max_position_pct=0.05,
-            kelly_fraction=0.5,
+            min_edge=0.05,           # DOUBLE DOWN: lowered from 0.08 (more trades qualify)
+            max_position_pct=0.08,   # DOUBLE DOWN: increased from 0.05 (bigger positions)
+            kelly_fraction=0.6,      # DOUBLE DOWN: increased from 0.5 (more aggressive sizing)
             rationale_prefix=f"NBA({consensus.confidence})",
         )
 
@@ -252,7 +253,7 @@ async def run_nba_consensus_cycle(
 
     # 5. Sort by edge and execute top signals
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 4
+    max_trades = 6  # DOUBLE DOWN: increased from 4 (more NBA bets)
 
     logger.info(f"NBA CONSENSUS: Top signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):

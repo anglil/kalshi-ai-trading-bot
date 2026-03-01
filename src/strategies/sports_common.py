@@ -542,6 +542,19 @@ async def execute_sports_trade(
     Returns True if order was placed successfully.
     """
     try:
+        # Capital guard for sports
+        try:
+            bal_resp = await kalshi_client.get_balance()
+            available_cash = bal_resp.get('balance', 0) / 100.0
+            if available_cash < 20.0:
+                logger.warning(
+                    f"CAPITAL GUARD: Cash ${available_cash:.2f} < $20. "
+                    f"Refusing sports trade on {signal.market.ticker}."
+                )
+                return False
+        except Exception as e:
+            logger.warning(f"Sports capital check failed: {e}")
+
         existing = await db_manager.get_position_by_market_and_side(
             signal.market.ticker, signal.side,
         )

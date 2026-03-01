@@ -267,9 +267,9 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
 # Only 30c+ contracts have a chance of being profitable.
 MIN_ENTRY_PRICE_CENTS = 30
 
-# TURNAROUND v3: Maximum 2 brackets per city per cycle.
-# The big wins came from 1-2 high-conviction bets, not 10+ scattered ones.
-MAX_BRACKETS_PER_CITY = 2
+# DOUBLE DOWN: Increased from 2 to 3 brackets per city per cycle.
+# Weather is our #1 earner — allow more bets on closest brackets.
+MAX_BRACKETS_PER_CITY = 3
 
 
 def _bracket_distance_to_forecast(bracket: TemperatureBracket, forecast: float) -> float:
@@ -474,9 +474,9 @@ async def execute_weather_trade(
     Returns True if order was placed successfully.
     """
     try:
-        # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
-        # TURNAROUND v3: Raised from $10 to $50 to preserve capital for winners
-        MIN_CASH_TO_TRADE = 50.0
+        # === CAPITAL PROTECTION ===
+        # DOUBLE DOWN: Lowered from $50 to $20 for weather (our top earner needs to trade)
+        MIN_CASH_TO_TRADE = 20.0
         try:
             bal_resp = await kalshi_client.get_balance()
             available_cash = bal_resp.get('balance', 0) / 100.0
@@ -624,8 +624,8 @@ async def run_weather_trading_cycle(
         logger.error(f"Could not fetch balance: {e}")
         return results
     
-    # Cap weather exposure at 30% of portfolio
-    weather_bankroll = bankroll * 0.30
+    # DOUBLE DOWN: Weather gets 50% of portfolio (was 30%) — it's our top earner
+    weather_bankroll = bankroll * 0.50
     
     if weather_bankroll < 5.0:
         logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f}")
@@ -678,15 +678,16 @@ async def run_weather_trading_cycle(
             bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
             
             # TURNAROUND v3: Pass forecast_high so signals are filtered to closest brackets
+            # DOUBLE DOWN: Bigger bets, lower edge threshold, more shares
             city_signals = generate_weather_signals(
                 brackets=brackets,
                 bracket_probs=bracket_probs,
                 city=station.city,
                 bankroll=weather_bankroll,
-                min_edge=0.15,
-                max_position_pct=0.03,
-                kelly_fraction=0.25,
-                max_shares=5,
+                min_edge=0.12,
+                max_position_pct=0.05,
+                kelly_fraction=0.30,
+                max_shares=8,
                 forecast_high=forecast_high,
             )
             
@@ -711,7 +712,7 @@ async def run_weather_trading_cycle(
     
     # Sort all signals by edge and take top 2 only
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 2  # TURNAROUND v3: Max 2 trades per cycle (was 3-5)
+    max_trades = 4  # DOUBLE DOWN: Max 4 trades per cycle — weather is our #1 profit driver
     
     logger.info(f"Top weather signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):
