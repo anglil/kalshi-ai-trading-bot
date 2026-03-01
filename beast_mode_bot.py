@@ -171,7 +171,9 @@ class BeastModeBot:
                 asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_nba_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_soccer_trading(db_manager, kalshi_client)),
-                asyncio.create_task(self._run_follow_the_leader(db_manager, kalshi_client)),
+                # FTL DISABLED: Strategy is a random penny lottery, not real leader-following.
+                # Kalshi API doesn't expose trader identities or P&L — "leaders" are just large trades.
+                # asyncio.create_task(self._run_follow_the_leader(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_trading_cycles(db_manager, kalshi_client, xai_client)),
                 asyncio.create_task(self._run_position_tracking(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_performance_evaluation(db_manager))
