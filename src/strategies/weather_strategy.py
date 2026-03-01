@@ -267,9 +267,10 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
 # Only 30c+ contracts have a chance of being profitable.
 MIN_ENTRY_PRICE_CENTS = 30
 
-# DOUBLE DOWN: Increased from 2 to 3 brackets per city per cycle.
-# Weather is our #1 earner — allow more bets on closest brackets.
-MAX_BRACKETS_PER_CITY = 3
+# FIX #2: Only 1 bracket per city-date — the single most extreme "obvious NO".
+# Data shows 3-4 brackets per city = 1 winner + 2-3 losers bleeding cash.
+# Picking only the best bracket eliminates the extra losing brackets.
+MAX_BRACKETS_PER_CITY = 1
 
 
 def _bracket_distance_to_forecast(bracket: TemperatureBracket, forecast: float) -> float:
@@ -490,34 +491,21 @@ async def execute_weather_trade(
         except Exception as e:
             logger.warning(f"Capital check failed: {e}")
 
-        # Check for existing position on KALSHI API (not just local DB)
+        # FIX #3: HARD NO-REBUY RULE
+        # If ANY position exists on this ticker (any side, any quantity), refuse.
+        # Data shows losers accumulate 3.3x more contracts than winners because
+        # the bot keeps re-buying across cycles. One entry per ticker, period.
         try:
             existing_api = await _check_existing_kalshi_position(kalshi_client, signal.bracket.ticker)
             existing_pos = existing_api.get('position', 0)
             existing_qty = abs(existing_pos)
-            existing_side = 'YES' if existing_pos > 0 else 'NO' if existing_pos < 0 else None
             
-            if existing_side and existing_side != signal.side.upper():
+            if existing_qty > 0:
                 logger.info(
-                    f"SKIP: Already hold {existing_qty} {existing_side} on "
-                    f"{signal.bracket.ticker} — would be contradictory to buy {signal.side}"
+                    f"NO-REBUY: Already hold {existing_qty} contracts on "
+                    f"{signal.bracket.ticker} — no re-buying allowed (Fix #3)"
                 )
                 return False
-            
-            from src.jobs.execute import MAX_CONTRACTS_PER_MARKET
-            if existing_qty >= MAX_CONTRACTS_PER_MARKET:
-                logger.info(
-                    f"SKIP: Already hold {existing_qty} contracts on "
-                    f"{signal.bracket.ticker} (max {MAX_CONTRACTS_PER_MARKET})"
-                )
-                return False
-            
-            allowed = MAX_CONTRACTS_PER_MARKET - existing_qty
-            if signal.shares > allowed:
-                logger.info(f"Reducing order from {signal.shares} to {allowed} on {signal.bracket.ticker}")
-                signal.shares = allowed
-                if signal.shares <= 0:
-                    return False
         except Exception as e:
             logger.warning(f"API position check failed, falling back to DB: {e}")
         
@@ -527,8 +515,8 @@ async def execute_weather_trade(
         )
         if existing:
             logger.info(
-                f"SKIP: Already hold {signal.bracket.ticker} {signal.side} in DB — "
-                f"no duplicate order placed"
+                f"NO-REBUY: Already hold {signal.bracket.ticker} {signal.side} in DB — "
+                f"no re-buying allowed (Fix #3)"
             )
             return False
 
@@ -712,7 +700,7 @@ async def run_weather_trading_cycle(
     
     # Sort all signals by edge and take top 2 only
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 4  # DOUBLE DOWN: Max 4 trades per cycle — weather is our #1 profit driver
+    max_trades = 4  # 1 bracket per city x 4 cities = max 4 trades per cycle
     
     logger.info(f"Top weather signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):

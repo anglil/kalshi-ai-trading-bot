@@ -38,7 +38,7 @@ logger = get_trading_logger("weather_consensus")
 # Risk management constants
 # ============================================================
 
-MAX_POSITIONS_PER_CITY = 3       # DOUBLE DOWN: increased from 2 (weather is our top earner)
+MAX_POSITIONS_PER_CITY = 1       # FIX #2: Only 1 bracket per city-date — eliminates extra losing brackets
 BRACKET_OVERLAP_THRESHOLD = 4    # °F — brackets within this range are "overlapping"
 MAX_DAILY_LOSSES_PER_CITY = 3    # DOUBLE DOWN: increased from 2 (allow more attempts)
 MIN_EDGE_THRESHOLD = 0.12        # DOUBLE DOWN: lowered from 20% to 12% (more trades qualify)
@@ -413,7 +413,7 @@ async def run_consensus_weather_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 4  # DOUBLE DOWN: Max 4 trades per cycle (was 2) — weather is our top earner
+    max_trades = 4  # 1 bracket per city x 4 cities = max 4 trades per cycle
 
     # Filter out signals for tickers where we already hold a position
     # Use KALSHI API as source of truth (not just local DB which may be incomplete)
