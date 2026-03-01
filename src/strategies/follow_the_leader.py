@@ -63,13 +63,15 @@ logger = get_trading_logger("follow_the_leader")
 MIN_EVENT_SPAN_HOURS   = 1.0     # only follow on low-frequency markets
 LARGE_TRADE_THRESHOLD  = 20      # min contracts per fill to count as "leader"
 LOOKBACK_MINUTES       = 60      # scan last 60 min of public trades
-TOP_N_LEADERS          = 5       # TURNAROUND v3: follow top 5 only (was 100 — way too many)
-MIN_LEADER_SCORE       = 5.0     # TURNAROUND v3: raised from 3.0 (higher conviction required)
-MAX_POSITION_DOLLARS   = 10.0    # TURNAROUND v3: reduced from $25 (smaller bets)
-KELLY_FRACTION         = 0.20    # TURNAROUND v3: reduced from 0.35 (more conservative)
-MIN_YES_PRICE          = 30      # TURNAROUND v3: raised from 15c (no cheap lottery tickets)
-MAX_YES_PRICE          = 85      # TURNAROUND v3: reduced from 95c (avoid overpaying)
-MIN_VOLUME             = 100     # TURNAROUND v3: raised from 50 (more liquid markets only)
+TOP_N_LEADERS          = 10      # FTL FIX: increased from 5 (penny bets are cheap, cast wider net)
+MIN_LEADER_SCORE       = 4.0     # FTL FIX: lowered from 5.0 (more signals qualify — losses are pennies)
+MAX_POSITION_DOLLARS   = 5.0     # FTL FIX: reduced from $10 (penny strategy doesn't need big sizing)
+KELLY_FRACTION         = 0.20    # Keep conservative
+MIN_YES_PRICE          = 5       # FTL FIX: lowered from 30c — FTL's ENTIRE edge is penny contracts
+                                  # Data: all 18 FTL fills were 0-15c, +$89 profit on $0.73 deployed
+                                  # Weather keeps its own 30c floor in weather_strategy.py
+MAX_YES_PRICE          = 85      # Keep — avoid overpaying
+MIN_VOLUME             = 50      # FTL FIX: lowered from 100 (penny markets often have lower volume)
 CYCLE_INTERVAL_SECS    = 1800    # 30 minutes
 
 
@@ -496,9 +498,9 @@ async def _execute_leader_trade(
             )
             return True
 
-        # === CAPITAL PROTECTION: Refuse to open new positions when cash is too low ===
-        # TURNAROUND v3: Raised from $10 to $50 to preserve capital for winners
-        MIN_CASH_TO_TRADE = 50.0
+        # === CAPITAL PROTECTION ===
+        # FTL FIX: Lowered from $50 to $10 — FTL trades cost pennies, don't need much cash
+        MIN_CASH_TO_TRADE = 10.0
         try:
             bal_resp = await kalshi_client.get_balance()
             available_cash = bal_resp.get('balance', 0) / 100.0
