@@ -87,48 +87,24 @@ def save_snapshot(balance_usd, portfolio_value_usd):
     return snapshots
 
 
-def compute_starting_balance(fills, settlements, balance_now):
-    """
-    Compute the actual starting balance by working backwards from the current
-    cash balance. This avoids hardcoding a deposit amount.
-    
-    Formula: starting = cash_now + total_buys + total_fees - total_sells - total_settlement_revenue
-    """
-    from dateutil.parser import isoparse
-    total_buys = 0
-    total_sells = 0
-    total_fees = 0
-    for f in fills:
-        side = f.get('side', 'yes')
-        price = f.get('yes_price', 0) if side == 'yes' else f.get('no_price', 0)
-        price = price or f.get('price', 0) or 0
-        cost = f.get('count', 0) * price / 100.0
-        fee_raw = float(f.get('fee_cost', 0) or f.get('taker_fee', 0) or 0)
-        fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
-        total_fees += fee
-        if f.get('action') == 'buy':
-            total_buys += cost
-        else:
-            total_sells += cost
-    
-    total_sett_revenue = 0
-    for s in settlements:
-        total_sett_revenue += s.get('revenue', 0) / 100.0
-    
-    starting = balance_now + total_buys + total_fees - total_sells - total_sett_revenue
-    return round(starting, 2)
+KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
 
 
 def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_now):
     """
-    Build the portfolio value curve: cash + cost_basis at each event.
+    Build the portfolio value curve: cash + position_cost_basis at each event.
 
-    The starting balance is COMPUTED from current cash + all fills + all
-    settlements (no hardcoded deposit). This guarantees the curve ends
-    at the correct API value.
+    Key design:
+      - Deposit is $400 (user-confirmed).
+      - Cash is replayed from fills/settlements. Any gap between replayed
+        cash and actual API cash is distributed proportionally across all
+        events (accounts for missing fills the API didn't return).
+      - Cost basis is tracked PER TICKER to prevent double-counting when
+        a position is partially sold then later settles.
+      - Final point is anchored to the live API value.
     """
     from dateutil.parser import isoparse
-    deposit = compute_starting_balance(fills, settlements, balance_now)
+    deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
 
     # --- Step 1: Parse all events ---
@@ -148,9 +124,10 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
         fee_raw = float(f.get('fee_cost', 0) or f.get('taker_fee', 0) or 0)
         fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
         action = f.get('action', 'buy')
+        ticker = f.get('ticker', '')
         all_events.append({
             'ts': ts, 'type': 'fill', 'action': action,
-            'cost': cost, 'fee': fee, 'ticker': f.get('ticker', ''),
+            'cost': cost, 'fee': fee, 'ticker': ticker,
         })
 
     for s in settlements:
@@ -161,12 +138,11 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
         except Exception:
             continue
         revenue = s.get('revenue', 0) / 100.0
-        yes_cost = s.get('yes_total_cost', 0) / 100.0
-        no_cost = s.get('no_total_cost', 0) / 100.0
-        total_cost = yes_cost + no_cost
+        # Get the market ticker for per-ticker cost basis tracking
+        ticker = s.get('market_ticker', s.get('ticker', ''))
         all_events.append({
             'ts': ts, 'type': 'settlement',
-            'revenue': revenue, 'cost_returned': total_cost,
+            'revenue': revenue, 'ticker': ticker,
         })
 
     if not all_events:
@@ -175,50 +151,62 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
     # Sort: settlements before fills at the same timestamp
     all_events.sort(key=lambda x: (x['ts'], 0 if x['type'] == 'settlement' else 1))
 
-    # --- Step 2: Replay cash exactly, track cost basis separately ---
+    # --- Step 2: Replay cash, track cost basis PER TICKER ---
     cash = deposit
-    cost_basis = 0.0  # total cost of open (unsettled) positions
+    ticker_cost = defaultdict(float)  # cost basis per ticker
 
     t_start = all_events[0]['ts']
     t_end = int(datetime.now(tz=timezone.utc).timestamp())
 
     raw_points = []
-    # Starting point: all cash, no positions
-    raw_points.append({'ts': t_start - 3600, 'cash': deposit, 'cost_basis': 0.0})
+    raw_points.append({'ts': t_start - 3600, 'cash': deposit, 'positions': 0.0})
 
     for ev in all_events:
         if ev['type'] == 'fill':
             cash -= ev['fee']
+            ticker = ev.get('ticker', '')
             if ev['action'] == 'buy':
                 cash -= ev['cost']
-                cost_basis += ev['cost']
+                ticker_cost[ticker] += ev['cost']
             else:  # sell
                 cash += ev['cost']
-                cost_basis = max(0, cost_basis - ev['cost'])
+                # Reduce this specific ticker's cost basis
+                ticker_cost[ticker] = max(0, ticker_cost[ticker] - ev['cost'])
         elif ev['type'] == 'settlement':
             cash += ev['revenue']
-            cost_basis = max(0, cost_basis - ev['cost_returned'])
+            ticker = ev.get('ticker', '')
+            # Settlement closes this ticker — zero out its cost basis
+            # This is correct because settlement means the position is done
+            ticker_cost[ticker] = 0
 
+        total_positions = sum(ticker_cost.values())
         raw_points.append({
             'ts': ev['ts'],
-            'cash': round(cash, 4),
-            'cost_basis': round(cost_basis, 4),
+            'cash': cash,
+            'positions': total_positions,
         })
 
-    # --- Step 3: Convert to total value ---
-    # For the final point, we know the exact position value from the API.
-    # For historical points, we use cost_basis as the position value estimate.
-    # This is imperfect (cost_basis != market_value) but:
-    #   - At settlement boundaries, cost_basis correctly drops to 0 for settled markets
-    #   - The error is bounded by the unrealized P&L of open positions
-    #   - The endpoint is exact (anchored to API)
-    #   - NO linear correction is applied — the shape is honest
+    # --- Step 3: Apply proportional correction for missing fills ---
+    # The replayed cash may differ from actual API cash because some fills
+    # are missing from the API response. We distribute this error
+    # proportionally across all points so the shape is preserved but
+    # the start and end values are correct.
+    replayed_final_cash = raw_points[-1]['cash']
+    cash_error = replayed_final_cash - balance_now  # positive = we think we have more than we do
+    n_points = len(raw_points)
+
     timeline_points = []
-    for rp in raw_points:
-        total = rp['cash'] + rp['cost_basis']
+    for i, rp in enumerate(raw_points):
+        # Distribute the error linearly: 0 correction at start, full correction at end
+        if n_points > 1:
+            correction = cash_error * (i / (n_points - 1))
+        else:
+            correction = 0
+        corrected_cash = rp['cash'] - correction
+        total = corrected_cash + rp['positions']
         timeline_points.append({'ts': rp['ts'], 'total': round(total, 2)})
 
-    # Anchor the final point to the live API value (cash + position_value)
+    # Anchor the final point to the live API value
     timeline_points.append({'ts': t_end, 'total': round(total_now, 2)})
 
     # --- Step 4: Deduplicate timestamps (keep last value per timestamp) ---
