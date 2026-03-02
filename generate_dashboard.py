@@ -19,7 +19,22 @@ async def fetch_data():
     data = {}
     data['balance'] = await client.get_balance()
     data['positions'] = await client.get_positions()
-    data['fills'] = await client.get_fills(limit=1000)
+    # Fetch ALL fills (paginated) — same pattern as settlements
+    all_fills = []
+    cursor = None
+    while True:
+        params = {'limit': 1000}
+        if cursor:
+            params['cursor'] = cursor
+        result = await client._make_authenticated_request(
+            'GET', '/trade-api/v2/portfolio/fills', params=params
+        )
+        fills = result.get('fills', [])
+        all_fills.extend(fills)
+        cursor = result.get('cursor')
+        if not cursor or not fills:
+            break
+    data['fills'] = {'fills': all_fills}  # wrap in dict to match existing code
     data['orders'] = await client.get_orders()
 
     # Fetch ALL settlements (paginated)
@@ -69,9 +84,14 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
         if ts == 0:
             continue
         count = f.get('count', 0)
-        price_cents = f.get('price', 0)
+        side = f.get('side', 'yes')
+        # Use yes_price/no_price (the actual fill fields) instead of 'price'
+        if side == 'yes':
+            price_cents = f.get('yes_price', 0) or f.get('price', 0) or 0
+        else:
+            price_cents = f.get('no_price', 0) or f.get('price', 0) or 0
         cost = (count * price_cents) / 100.0
-        fee_raw = float(f.get('fee_cost', 0))
+        fee_raw = float(f.get('fee_cost', 0) or f.get('taker_fee', 0) or 0)
         fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
         action = f.get('action', 'buy')
         all_events.append({
@@ -254,7 +274,9 @@ def process_data(data):
     total_exposure = sum(p.get('event_exposure', 0) for p in event_positions) / 100
     total_cost = sum(p.get('total_cost', 0) for p in event_positions) / 100
 
-    # Open positions (exposure > 0)
+    # Open positions — use market_positions for accurate count (event_positions groups by event)
+    open_market_positions = [p for p in market_positions if p.get('position', 0) != 0]
+    # Keep event-level for P&L tracking
     open_positions = [p for p in event_positions if p.get('event_exposure', 0) > 0]
     closed_positions = [p for p in event_positions if p.get('event_exposure', 0) == 0]
 
@@ -278,7 +300,12 @@ def process_data(data):
     for fill in fills_sorted:
         ts = fill.get('ts', 0)
         dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')
-        cost = fill.get('count', 0) * fill.get('price', 0)
+        fill_side = fill.get('side', 'yes')
+        if fill_side == 'yes':
+            fill_price = fill.get('yes_price', 0) or fill.get('price', 0) or 0
+        else:
+            fill_price = fill.get('no_price', 0) or fill.get('price', 0) or 0
+        cost = fill.get('count', 0) * fill_price
         if fill.get('action') == 'buy':
             cumulative_cost += cost
         else:
@@ -288,10 +315,10 @@ def process_data(data):
             'ts': ts,
             'action': fill.get('action', ''),
             'ticker': fill.get('ticker', ''),
-            'side': fill.get('side', ''),
+            'side': fill_side,
             'count': fill.get('count', 0),
-            'price': fill.get('price', 0),
-            'fee': float(fill.get('fee_cost', 0)),
+            'price': fill_price,
+            'fee': float(fill.get('fee_cost', 0) or fill.get('taker_fee', 0) or 0),
             'category': categorize_ticker(fill.get('ticker', '')),
         })
 
@@ -329,6 +356,7 @@ def process_data(data):
         'total_exposure': total_exposure,
         'total_cost': total_cost,
         'open_positions': open_positions,
+        'open_market_positions': open_market_positions,
         'closed_positions': closed_positions,
         'event_positions': event_positions,
         'market_positions': market_positions,
@@ -513,7 +541,7 @@ def generate_html(metrics, generated_at):
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Open Positions</div>
-    <div class="text-xl font-bold text-white">{len(metrics['open_positions'])}</div>
+     <div class="text-xl font-bold text-white">{len(metrics['open_market_positions'])}</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Total Trades</div>
@@ -594,7 +622,7 @@ def generate_html(metrics, generated_at):
 <!-- Open Positions Table -->
 <div class="card p-4 mb-4">
   <div class="flex items-center justify-between mb-3">
-    <div class="text-sm font-semibold text-white">📋 Open Positions ({len(metrics['open_positions'])})</div>
+    <div class="text-sm font-semibold text-white">📋 Open Positions ({len(metrics['open_market_positions'])})</div>
     <span class="badge badge-blue">Live</span>
   </div>
   <div class="scrollable">
@@ -929,7 +957,7 @@ async def main():
     print(f"Portfolio Value: ${metrics['portfolio_value_usd']:.2f}")
     print(f"Total Account: ${metrics['total_value_usd']:.2f}")
     print(f"Realized P&L: ${metrics['total_realized_pnl']:+.2f}")
-    print(f"Open Positions: {len(metrics['open_positions'])}")
+    print(f"Open Positions: {len(metrics['open_market_positions'])}")
     print(f"Total Fills: {metrics['total_trades']}")
     print(f"Win Rate: {metrics['win_rate']:.0f}%")
 

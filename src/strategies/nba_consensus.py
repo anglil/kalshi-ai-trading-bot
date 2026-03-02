@@ -231,19 +231,27 @@ async def run_nba_consensus_cycle(
 
         # Generate signals
         game_desc = f"{forecast.away_team}@{forecast.home_team}"
-        # DOUBLE DOWN: NBA is our only positive-ROI strategy (+7.2%)
         signals = generate_sports_signals(
             outcomes=outcomes,
             consensus=consensus,
             game_desc=game_desc,
             bankroll=bankroll,
-            min_edge=0.05,           # DOUBLE DOWN: lowered from 0.08 (more trades qualify)
-            max_position_pct=0.08,   # DOUBLE DOWN: increased from 0.05 (bigger positions)
-            kelly_fraction=0.6,      # DOUBLE DOWN: increased from 0.5 (more aggressive sizing)
+            min_edge=0.08,           # Restored: require real edge
+            max_position_pct=0.05,   # Conservative sizing
+            kelly_fraction=0.5,      # Standard Kelly
             rationale_prefix=f"NBA({consensus.confidence})",
         )
 
-        all_signals.extend(signals)
+        # SINGLE-SIDE FILTER: Only bet the ONE side with the highest edge
+        # per game. Never bet both sides — that guarantees losing the spread.
+        if signals:
+            best_signal = max(signals, key=lambda s: s.edge)
+            logger.info(
+                f"NBA SINGLE-SIDE: {game_desc} — picked {best_signal.market.outcome} "
+                f"{best_signal.side} (edge={best_signal.edge:.0%}), "
+                f"rejected {len(signals)-1} other side(s)"
+            )
+            all_signals.append(best_signal)
 
     results["signals_generated"] = len(all_signals)
 
@@ -253,7 +261,7 @@ async def run_nba_consensus_cycle(
 
     # 5. Sort by edge and execute top signals
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 6  # DOUBLE DOWN: increased from 4 (more NBA bets)
+    max_trades = 4  # One side per game, max 4 games
 
     logger.info(f"NBA CONSENSUS: Top signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):
