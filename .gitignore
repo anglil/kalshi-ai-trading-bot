@@ -209,3 +209,4 @@ secrets.yaml
 *.pem
 *.key
 .env*
+portfolio_snapshots.json

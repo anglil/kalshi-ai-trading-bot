@@ -58,30 +58,77 @@ async def fetch_data():
     return data
 
 
-KNOWN_DEPOSIT = 400.0  # User's actual starting deposit
+SNAPSHOT_FILE = os.path.join(os.path.dirname(__file__), 'portfolio_snapshots.json')
+
+
+def load_snapshots():
+    """Load accumulated portfolio snapshots from disk."""
+    if os.path.exists(SNAPSHOT_FILE):
+        try:
+            with open(SNAPSHOT_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return []
+
+
+def save_snapshot(balance_usd, portfolio_value_usd):
+    """Append a new snapshot with the current API values."""
+    snapshots = load_snapshots()
+    now_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    total = round(balance_usd + portfolio_value_usd, 2)
+    # Don't save duplicate if last snapshot is within 5 minutes
+    if snapshots and abs(snapshots[-1]['ts'] - now_ts) < 300:
+        snapshots[-1] = {'ts': now_ts, 'total': total, 'cash': round(balance_usd, 2), 'positions': round(portfolio_value_usd, 2)}
+    else:
+        snapshots.append({'ts': now_ts, 'total': total, 'cash': round(balance_usd, 2), 'positions': round(portfolio_value_usd, 2)})
+    with open(SNAPSHOT_FILE, 'w') as f:
+        json.dump(snapshots, f)
+    return snapshots
+
+
+def compute_starting_balance(fills, settlements, balance_now):
+    """
+    Compute the actual starting balance by working backwards from the current
+    cash balance. This avoids hardcoding a deposit amount.
+    
+    Formula: starting = cash_now + total_buys + total_fees - total_sells - total_settlement_revenue
+    """
+    from dateutil.parser import isoparse
+    total_buys = 0
+    total_sells = 0
+    total_fees = 0
+    for f in fills:
+        side = f.get('side', 'yes')
+        price = f.get('yes_price', 0) if side == 'yes' else f.get('no_price', 0)
+        price = price or f.get('price', 0) or 0
+        cost = f.get('count', 0) * price / 100.0
+        fee_raw = float(f.get('fee_cost', 0) or f.get('taker_fee', 0) or 0)
+        fee = fee_raw / 100.0 if fee_raw > 1.0 else fee_raw
+        total_fees += fee
+        if f.get('action') == 'buy':
+            total_buys += cost
+        else:
+            total_sells += cost
+    
+    total_sett_revenue = 0
+    for s in settlements:
+        total_sett_revenue += s.get('revenue', 0) / 100.0
+    
+    starting = balance_now + total_buys + total_fees - total_sells - total_sett_revenue
+    return round(starting, 2)
 
 
 def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_now):
     """
-    Build the portfolio value curve: cash + position_value at each event.
+    Build the portfolio value curve: cash + cost_basis at each event.
 
-    Approach:
-      - Cash is tracked exactly: starts at KNOWN_DEPOSIT, decremented by
-        buys+fees, incremented by sells and settlement revenue.
-      - Position value is NOT estimated from cost basis (that's wrong).
-        Instead, at each settlement we know positions went to zero for that
-        market. Between settlements, we DON'T know the market value of open
-        positions, so we carry forward the cost basis as a lower-bound
-        estimate, then anchor the final point to the live API value.
-      - NO linear correction hack. The curve may not perfectly match the
-        API at intermediate points, but the shape is accurate and the
-        endpoint is exact.
-      - Deposits/withdrawals: if replayed cash ever implies a deposit or
-        withdrawal happened (cash jumps that aren't explained by fills or
-        settlements), we detect and mark them.
+    The starting balance is COMPUTED from current cash + all fills + all
+    settlements (no hardcoded deposit). This guarantees the curve ends
+    at the correct API value.
     """
     from dateutil.parser import isoparse
-    deposit = KNOWN_DEPOSIT
+    deposit = compute_starting_balance(fills, settlements, balance_now)
     total_now = balance_now + portfolio_value_now
 
     # --- Step 1: Parse all events ---
@@ -272,6 +319,9 @@ def process_data(data):
     all_fills = data['fills'].get('fills', [])
     all_settlements = data.get('settlements', [])
     portfolio_timeline, deposit = build_portfolio_timeline(all_fills, all_settlements, balance_usd, portfolio_value_usd)
+
+    # Save a snapshot of the current portfolio value for future accumulation
+    save_snapshot(balance_usd, portfolio_value_usd)
 
     # Process event positions
     event_positions = data['positions'].get('event_positions', [])
