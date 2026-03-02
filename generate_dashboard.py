@@ -9,6 +9,9 @@ import sys
 import os
 from datetime import datetime, timezone
 from collections import defaultdict
+from zoneinfo import ZoneInfo
+
+PACIFIC = ZoneInfo('US/Pacific')
 
 sys.path.insert(0, '.')
 from src.clients.kalshi_client import KalshiClient
@@ -253,16 +256,16 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
     # --- Step 5: Format output ---
     timeline = []
     for rp in timeline_points:
-        dt = datetime.fromtimestamp(rp['ts'], tz=timezone.utc)
+        dt = datetime.fromtimestamp(rp['ts'], tz=timezone.utc).astimezone(PACIFIC)
         timeline.append({
             'ts': rp['ts'],
-            'label': dt.strftime('%b %d %H:%M'),
+            'label': dt.strftime('%b %d %I:%M%p').replace('AM','am').replace('PM','pm'),
             'total': rp['total'],
         })
 
     if timeline:
         timeline[-1]['total'] = round(total_now, 2)
-        timeline[-1]['label'] = datetime.now(tz=timezone.utc).strftime('%b %d %H:%M')
+        timeline[-1]['label'] = datetime.now(tz=timezone.utc).astimezone(PACIFIC).strftime('%b %d %I:%M%p').replace('AM','am').replace('PM','pm')
 
     return timeline, deposit
 
@@ -369,7 +372,7 @@ def process_data(data):
     cumulative_cost = 0
     for fill in fills_sorted:
         ts = fill.get('ts', 0)
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%Y-%m-%d %H:%M')
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(PACIFIC).strftime('%Y-%m-%d %I:%M%p').replace('AM','am').replace('PM','pm')
         fill_side = fill.get('side', 'yes')
         if fill_side == 'yes':
             fill_price = fill.get('yes_price', 0) or fill.get('price', 0) or 0
@@ -414,7 +417,7 @@ def process_data(data):
     hourly = defaultdict(int)
     for f in fills:
         ts = f.get('ts', 0)
-        hour = datetime.fromtimestamp(ts, tz=timezone.utc).hour
+        hour = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(PACIFIC).hour
         hourly[hour] += 1
 
     return {
@@ -504,7 +507,7 @@ def generate_html(metrics, generated_at):
     fill_rows = []
     for f in recent_fills:
         ts = f.get('ts', 0)
-        dt = datetime.fromtimestamp(ts, tz=timezone.utc).strftime('%m/%d %H:%M')
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(PACIFIC).strftime('%m/%d %I:%M%p').replace('AM','am').replace('PM','pm')
         action_class = 'text-green-400' if f.get('action') == 'buy' else 'text-red-400'
         fill_ticker = f.get('ticker', '')
         fill_rows.append({
@@ -683,7 +686,7 @@ def generate_html(metrics, generated_at):
 
   <!-- Hourly Activity -->
   <div class="card p-4">
-    <div class="text-sm font-semibold text-white mb-3">🕐 Hourly Trading Activity (UTC)</div>
+    <div class="text-sm font-semibold text-white mb-3">🕐 Hourly Trading Activity (Pacific)</div>
     <canvas id="hourlyChart"></canvas>
   </div>
 
@@ -746,7 +749,7 @@ def generate_html(metrics, generated_at):
     <table class="w-full text-xs">
       <thead>
         <tr class="text-slate-400 border-b border-slate-700">
-          <th class="text-left py-2 pr-3">Time (UTC)</th>
+          <th class="text-left py-2 pr-3">Time (PT)</th>
           <th class="text-left py-2 pr-3">Market</th>
           <th class="text-left py-2 pr-3">Strategy</th>
           <th class="text-center py-2 pr-3">Action</th>
@@ -1015,7 +1018,7 @@ async def main():
     data = await fetch_data()
     print("Processing metrics...")
     metrics = process_data(data)
-    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+    generated_at = datetime.now(tz=timezone.utc).astimezone(PACIFIC).strftime('%Y-%m-%d %I:%M:%S %p PT')
     print("Generating dashboard HTML...")
     html = generate_html(metrics, generated_at)
     output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.html')
