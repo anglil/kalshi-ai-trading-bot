@@ -186,24 +186,15 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
             'positions': total_positions,
         })
 
-    # --- Step 3: Apply proportional correction for missing fills ---
+    # --- Step 3: NO proportional correction ---
     # The replayed cash may differ from actual API cash because some fills
-    # are missing from the API response. We distribute this error
-    # proportionally across all points so the shape is preserved but
-    # the start and end values are correct.
-    replayed_final_cash = raw_points[-1]['cash']
-    cash_error = replayed_final_cash - balance_now  # positive = we think we have more than we do
-    n_points = len(raw_points)
-
+    # are missing from the API response. Instead of spreading this error
+    # across the curve (which creates a false downward trend), we keep
+    # the raw curve shape intact. The deposit line stays at $400 (true).
+    # Only the FINAL point is anchored to the live API value.
     timeline_points = []
-    for i, rp in enumerate(raw_points):
-        # Distribute the error linearly: 0 correction at start, full correction at end
-        if n_points > 1:
-            correction = cash_error * (i / (n_points - 1))
-        else:
-            correction = 0
-        corrected_cash = rp['cash'] - correction
-        total = corrected_cash + rp['positions']
+    for rp in raw_points:
+        total = rp['cash'] + rp['positions']
         timeline_points.append({'ts': rp['ts'], 'total': round(total, 2)})
 
     # Anchor the final point to the live API value
