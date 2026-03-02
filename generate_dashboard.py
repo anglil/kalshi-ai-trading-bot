@@ -96,16 +96,26 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
 
     Key design:
       - Deposit is $400 (user-confirmed).
-      - Cash is replayed from fills/settlements. Any gap between replayed
-        cash and actual API cash is distributed proportionally across all
-        events (accounts for missing fills the API didn't return).
-      - Cost basis is tracked PER TICKER to prevent double-counting when
-        a position is partially sold then later settles.
+      - Cash is replayed from fills/settlements.
+      - Settlement fees are subtracted (separate from fill fees).
+      - For settled tickers, use settlement's yes_total_cost/no_total_cost as
+        the authoritative cost basis (fixes missing-fill gap).
+      - Cost basis is tracked PER TICKER to prevent double-counting.
       - Final point is anchored to the live API value.
     """
     from dateutil.parser import isoparse
     deposit = KNOWN_DEPOSIT
     total_now = balance_now + portfolio_value_now
+
+    # --- Step 0: Build authoritative cost basis from settlements ---
+    # Settlements report the TRUE cost Kalshi tracked, which includes fills
+    # the API may not have returned to us.
+    settlement_cost_basis = {}  # ticker -> total cost in USD
+    for s in settlements:
+        ticker = s.get('ticker', '')
+        yes_cost = s.get('yes_total_cost', 0) / 100.0  # cents -> USD
+        no_cost = s.get('no_total_cost', 0) / 100.0
+        settlement_cost_basis[ticker] = yes_cost + no_cost
 
     # --- Step 1: Parse all events ---
     all_events = []
@@ -138,11 +148,13 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
         except Exception:
             continue
         revenue = s.get('revenue', 0) / 100.0
-        # Get the market ticker for per-ticker cost basis tracking
-        ticker = s.get('market_ticker', s.get('ticker', ''))
+        ticker = s.get('ticker', '')
+        # Settlement fee — separate from fill fees
+        sett_fee = float(s.get('fee_cost', 0) or 0)
         all_events.append({
             'ts': ts, 'type': 'settlement',
             'revenue': revenue, 'ticker': ticker,
+            'settlement_fee': sett_fee,
         })
 
     if not all_events:
@@ -154,6 +166,11 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
     # --- Step 2: Replay cash, track cost basis PER TICKER ---
     cash = deposit
     ticker_cost = defaultdict(float)  # cost basis per ticker
+    # Track BUY-ONLY cost per ticker (not net of sells) for missing-fill detection.
+    # The fills API is missing some buy fills. We detect this by comparing
+    # our buy total against the settlement's authoritative cost.
+    # Sells are tracked separately and already returned cash to the replay.
+    fill_buy_cost_per_ticker = defaultdict(float)
 
     t_start = all_events[0]['ts']
     t_end = int(datetime.now(tz=timezone.utc).timestamp())
@@ -168,16 +185,33 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
             if ev['action'] == 'buy':
                 cash -= ev['cost']
                 ticker_cost[ticker] += ev['cost']
+                fill_buy_cost_per_ticker[ticker] += ev['cost']
             else:  # sell
                 cash += ev['cost']
-                # Reduce this specific ticker's cost basis
                 ticker_cost[ticker] = max(0, ticker_cost[ticker] - ev['cost'])
         elif ev['type'] == 'settlement':
-            cash += ev['revenue']
             ticker = ev.get('ticker', '')
-            # Settlement closes this ticker — zero out its cost basis
-            # This is correct because settlement means the position is done
+            # Subtract settlement fee from cash
+            cash -= ev.get('settlement_fee', 0)
+
+            # Use settlement's authoritative cost basis to fix missing fills.
+            # Compare settlement cost against BUY-ONLY fills (not net of sells).
+            # Sells already returned cash to the replay, so they don't affect
+            # the missing-buy calculation.
+            auth_cost = settlement_cost_basis.get(ticker, 0)
+            our_buy_cost = fill_buy_cost_per_ticker.get(ticker, 0)
+            missing_fill_cost = max(0, auth_cost - our_buy_cost)
+            if missing_fill_cost > 0:
+                cash -= missing_fill_cost
+                # Also add the missing cost to ticker_cost so positions value
+                # reflects the true cost basis before this settlement zeroes it
+                ticker_cost[ticker] += missing_fill_cost
+
+            # Add settlement revenue
+            cash += ev['revenue']
+            # Zero out this ticker's cost basis — position is closed
             ticker_cost[ticker] = 0
+            fill_buy_cost_per_ticker[ticker] = 0
 
         total_positions = sum(ticker_cost.values())
         raw_points.append({
@@ -186,12 +220,10 @@ def build_portfolio_timeline(fills, settlements, balance_now, portfolio_value_no
             'positions': total_positions,
         })
 
-    # --- Step 3: NO proportional correction ---
-    # The replayed cash may differ from actual API cash because some fills
-    # are missing from the API response. Instead of spreading this error
-    # across the curve (which creates a false downward trend), we keep
-    # the raw curve shape intact. The deposit line stays at $400 (true).
-    # Only the FINAL point is anchored to the live API value.
+    # --- Step 3: Build timeline ---
+    # The replayed cash should now closely match the API cash because we've
+    # accounted for settlement fees and missing fills. Any remaining small
+    # gap is from rounding. No proportional correction needed.
     timeline_points = []
     for rp in raw_points:
         total = rp['cash'] + rp['positions']
