@@ -166,9 +166,11 @@ class BeastModeBot:
             tasks = [
                 ingestion_task,  # Already started
                 asyncio.create_task(self._run_weather_trading(db_manager, kalshi_client)),
-                asyncio.create_task(self._run_gas_trading(db_manager, kalshi_client)),
+                # GAS DISABLED: No gas price markets on Kalshi
+                # asyncio.create_task(self._run_gas_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_econ_trading(db_manager, kalshi_client)),
-                asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
+                # FLU DISABLED: No flu/ILI markets on Kalshi
+                # asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_nba_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_soccer_trading(db_manager, kalshi_client)),
                 # FTL DISABLED: Strategy is a random penny lottery, not real leader-following.

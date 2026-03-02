@@ -109,7 +109,8 @@ def _normal_cdf(x: float) -> float:
 def forecast_to_bracket_probs(
     forecast_high: float,
     brackets: List[TemperatureBracket],
-    sigma: float = 5.0
+    sigma: float = 5.0,
+    normalize: bool = True,
 ) -> Dict[str, float]:
     """
     Convert a point forecast into bracket probabilities using a Gaussian
@@ -142,9 +143,12 @@ def forecast_to_bracket_probs(
             probs[bracket.ticker] = 0.0
     
     # Normalize to ensure probabilities sum to 1
-    total = sum(probs.values())
-    if total > 0:
-        probs = {k: v / total for k, v in probs.items()}
+    # SKIP normalization for cumulative brackets (econ markets: "above X%")
+    # where each bracket is independent, not exclusive ranges
+    if normalize:
+        total = sum(probs.values())
+        if total > 0:
+            probs = {k: v / total for k, v in probs.items()}
     
     return probs
 

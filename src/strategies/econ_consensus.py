@@ -352,19 +352,11 @@ async def run_econ_consensus_cycle(
     strategy_tag = "econ_consensus"
     logger.info(f"ECON CONSENSUS: Starting cycle (paper={paper_mode})...")
 
-    # EMERGENCY PAUSE: The Gaussian model produces completely wrong probabilities
-    # for econ brackets because brackets overlap (e.g., "CPI >= 0%" overlaps with
-    # "CPI 2.5%-3.0%"). After normalization, P(CPI >= 0%) becomes 1% instead of ~100%.
-    # This causes the bot to bet that CPI will go NEGATIVE, which hasn't happened since 2009.
-    ECON_TRADING_PAUSED = True
-    if ECON_TRADING_PAUSED:
-        logger.warning("ECON PAUSED: Econ trading paused due to bracket overlap bug in Gaussian model. "
-                       "Set ECON_TRADING_PAUSED=False to resume.")
-        results: Dict = {
-            "indicators_analyzed": 0, "brackets_found": 0, "signals_generated": 0,
-            "orders_placed": 0, "total_position_value": 0.0, "paper_mode": paper_mode,
-        }
-        return results
+    # FIXED: The Gaussian model now skips normalization for cumulative "above X"
+    # brackets (CPI/GDP). Each bracket's probability is computed independently
+    # from the Gaussian CDF, which is correct for cumulative markets.
+    # Only trade GDP and CPI — NFP has no Kalshi markets.
+    ACTIVE_INDICATORS = ["CPI", "GDP"]
 
     results: Dict = {
         "indicators_analyzed": 0,
@@ -392,6 +384,9 @@ async def run_econ_consensus_cycle(
     all_signals: List[WeatherTradeSignal] = []
 
     for indicator_name, indicator in ECON_INDICATORS.items():
+        if indicator_name not in ACTIVE_INDICATORS:
+            logger.info(f"ECON CONSENSUS ({indicator_name}): skipped — no active Kalshi markets")
+            continue
         try:
             results["indicators_analyzed"] += 1
 
@@ -435,9 +430,19 @@ async def run_econ_consensus_cycle(
                 consensus_for_brackets = consensus.consensus_value
                 sigma_for_brackets = consensus.sigma
 
+            # Detect if brackets are cumulative (all "above X" type)
+            # If so, skip normalization — probabilities are already correct
+            all_above = all(b.low is not None and b.high is None for b in brackets)
+            all_below = all(b.high is not None and b.low is None for b in brackets)
+            is_cumulative = all_above or all_below
+            
             bracket_probs = forecast_to_bracket_probs(
                 consensus_for_brackets, brackets, sigma=sigma_for_brackets,
+                normalize=not is_cumulative,  # Skip normalization for cumulative brackets
             )
+            
+            if is_cumulative:
+                logger.info(f"ECON ({indicator_name}): Cumulative brackets detected — normalization SKIPPED")
 
             # 5. Generate trade signals
             # Econ gets higher allocation since it's the only profitable strategy
@@ -446,11 +451,11 @@ async def run_econ_consensus_cycle(
                 bracket_probs=bracket_probs,
                 city=indicator_name,
                 bankroll=bankroll,
-                min_edge=0.08,
-                max_position_pct=0.08,  # Increased from 5% to 8% per bracket
-                kelly_fraction=0.5,
+                min_edge=0.12,         # Same as weather — require 12% edge
+                max_position_pct=0.05, # Conservative — 5% max per bracket
+                kelly_fraction=0.30,   # Same as weather
                 rationale_prefix=f"ECON-{indicator_name}({consensus.confidence})",
-                max_shares=10,  # Allow larger positions for econ
+                max_shares=5,          # Conservative for new strategy
             )
 
             if indicator_signals:
@@ -474,7 +479,7 @@ async def run_econ_consensus_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 8  # Increased from 5 — econ is the primary profit driver
+    max_trades = 4  # Conservative — 2 per indicator (CPI + GDP)
 
     logger.info(f"ECON CONSENSUS: Top signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):
