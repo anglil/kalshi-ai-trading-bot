@@ -41,7 +41,7 @@ logger = get_trading_logger("weather_consensus")
 MAX_POSITIONS_PER_CITY = 1       # FIX #2: Only 1 bracket per city-date — eliminates extra losing brackets
 BRACKET_OVERLAP_THRESHOLD = 4    # °F — brackets within this range are "overlapping"
 MAX_DAILY_LOSSES_PER_CITY = 3    # DOUBLE DOWN: increased from 2 (allow more attempts)
-MIN_EDGE_THRESHOLD = 0.12        # DOUBLE DOWN: lowered from 20% to 12% (more trades qualify)
+MIN_EDGE_THRESHOLD = 0.08        # LOOSENED: lowered from 12% to 8% (more trades qualify)
 KELLY_FRACTION = 0.30            # DOUBLE DOWN: increased from 0.20 (bigger bets on winners)
 MAX_POSITION_PCT = 0.05          # DOUBLE DOWN: increased from 3% to 5% per bracket
 MAX_SHARES_PER_TRADE = 8         # DOUBLE DOWN: increased from 3 to 8 (bigger positions)
@@ -351,18 +351,21 @@ async def run_consensus_weather_cycle(
                 f"(temps={[f'{t:.0f}' for t in consensus.all_temps]})"
             )
 
-            # 3. Low confidence or skip → try fallback
-            if consensus.confidence in ("low", "skip"):
-                if consensus.confidence == "skip" and consensus.source_count > 0:
+            # 3. Skip only when data is insufficient; allow low confidence with wider sigma
+            if consensus.confidence == "skip":
+                if consensus.source_count > 0:
                     logger.info(f"CONSENSUS {station.city}: falling back to NWS-only")
                     fallback = await _nws_fallback_for_city(
                         station, kalshi_client, db_manager, weather_bankroll, target_date,
                     )
                     all_signals.extend(fallback)
                 else:
-                    logger.info(f"CONSENSUS {station.city}: skipping (low confidence)")
+                    logger.info(f"CONSENSUS {station.city}: skipping (no sources)")
                 await asyncio.sleep(1)
                 continue
+            # LOOSENED: low confidence now trades with wider sigma instead of skipping
+            if consensus.confidence == "low":
+                logger.info(f"CONSENSUS {station.city}: low confidence — trading with wider sigma={consensus.sigma:.1f}")
 
             # 4. Discover Kalshi markets
             brackets = await discover_weather_markets(kalshi_client, station, target_date)

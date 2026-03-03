@@ -39,7 +39,7 @@ logger = get_trading_logger("soccer_consensus")
 def _check_paper_performance(strategy: str) -> bool:
     """
     Check paper trading performance for auto-switch to live.
-    Returns True if criteria met: >=20 settled, win_rate>=55%, total_pnl>0.
+    Returns True if criteria met: >=10 settled, win_rate>=50%, total_pnl>0.
     """
     try:
         conn = get_paper_db()
@@ -49,14 +49,14 @@ def _check_paper_performance(strategy: str) -> bool:
         ).fetchall()
         conn.close()
 
-        if len(rows) < 20:
+        if len(rows) < 10:  # LOOSENED: was 20
             return False
 
         wins = sum(1 for r in rows if r["outcome"] == "win")
         win_rate = wins / len(rows) * 100
         total_pnl = sum(r["pnl"] for r in rows if r["pnl"] is not None)
 
-        if win_rate >= 55 and total_pnl > 0:
+        if win_rate >= 50 and total_pnl > 0:  # LOOSENED: was 55%
             logger.info(
                 f"SOCCER auto-switch: {len(rows)} settled, "
                 f"win_rate={win_rate:.1f}%, pnl=${total_pnl:.2f} — switching to LIVE"
@@ -207,12 +207,12 @@ async def run_soccer_consensus_cycle(
             )
             continue
 
+        # LOOSENED: low confidence now trades instead of skipping
         if consensus.confidence == "low":
             logger.info(
                 f"Soccer {forecast.home_team} vs {forecast.away_team}: "
-                f"low confidence (spread={consensus.max_spread:.2f}), skipping"
+                f"low confidence (spread={consensus.max_spread:.2f}) — trading anyway"
             )
-            continue
 
         league_name = SOCCER_LEAGUES.get(league_key, {}).get("name", league_key)
         logger.info(
@@ -242,7 +242,7 @@ async def run_soccer_consensus_cycle(
             consensus=consensus,
             game_desc=game_desc,
             bankroll=bankroll,
-            min_edge=0.08,
+            min_edge=0.05,           # LOOSENED: lowered from 8% to 5%
             max_position_pct=0.05,
             kelly_fraction=0.5,
             rationale_prefix=f"SOCCER({consensus.confidence})",

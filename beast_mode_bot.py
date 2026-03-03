@@ -429,7 +429,8 @@ class BeastModeBot:
 
                 cycle += 1
                 self.logger.info(f"⛽ Starting Gas Price Trading Cycle #{cycle}")
-                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
+                # Gas stays paper until 3rd source is fixed (only 2 sources: FRED/EIA + EIA Public, AAA broken)
+                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(
@@ -516,8 +517,9 @@ class BeastModeBot:
 
                 cycle += 1
                 self.logger.info(f"NBA: Starting NBA Trading Cycle #{cycle}")
+                # NBA stays paper until 3rd source is added (only 2 sources: ESPN BPI + Elo)
                 results = await run_nba_consensus_cycle(
-                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                    kalshi_client, db_manager, paper_mode=True,
                 )
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
@@ -547,8 +549,9 @@ class BeastModeBot:
 
                 cycle += 1
                 self.logger.info(f"Soccer: Starting Soccer Trading Cycle #{cycle}")
+                # Soccer stays paper until 2nd+ source is added (only 1 source: Elo)
                 results = await run_soccer_consensus_cycle(
-                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                    kalshi_client, db_manager, paper_mode=True,
                 )
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"

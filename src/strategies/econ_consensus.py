@@ -301,7 +301,7 @@ def _parse_econ_bracket(market: dict, indicator: EconIndicator) -> Optional[Temp
 def _check_paper_performance(strategy: str) -> bool:
     """
     Check paper trading performance for auto-switch to live.
-    Returns True if criteria met: >=20 settled, win_rate>=55%, total_pnl>0.
+    Returns True if criteria met: >=10 settled, win_rate>=50%, total_pnl>0.
     """
     try:
         conn = get_paper_db()
@@ -311,14 +311,14 @@ def _check_paper_performance(strategy: str) -> bool:
         ).fetchall()
         conn.close()
 
-        if len(rows) < 20:
+        if len(rows) < 10:  # LOOSENED: was 20
             return False
 
         wins = sum(1 for r in rows if r["outcome"] == "win")
         win_rate = wins / len(rows) * 100
         total_pnl = sum(r["pnl"] for r in rows if r["pnl"] is not None)
 
-        if win_rate >= 55 and total_pnl > 0:
+        if win_rate >= 50 and total_pnl > 0:  # LOOSENED: was 55%
             logger.info(
                 f"ECON auto-switch: {len(rows)} settled, "
                 f"win_rate={win_rate:.1f}%, pnl=${total_pnl:.2f} — switching to LIVE"
@@ -336,7 +336,7 @@ def _check_paper_performance(strategy: str) -> bool:
 async def run_econ_consensus_cycle(
     kalshi_client: KalshiClient,
     db_manager: DatabaseManager,
-    paper_mode: bool = True,
+    paper_mode: bool = False,  # LOOSENED: default to live (3 verified sources per indicator)
 ) -> Dict:
     """
     Run one complete economic data consensus trading cycle.
@@ -406,10 +406,13 @@ async def run_econ_consensus_cycle(
                 f"(values={[f'{v:.2f}' for v in consensus.all_values]})"
             )
 
-            if consensus.confidence in ("low", "skip"):
-                logger.info(f"ECON CONSENSUS ({indicator_name}): skipping (low confidence)")
+            if consensus.confidence == "skip":
+                logger.info(f"ECON CONSENSUS ({indicator_name}): skipping (insufficient sources)")
                 await asyncio.sleep(1)
                 continue
+            # LOOSENED: low confidence now trades with wider sigma instead of skipping
+            if consensus.confidence == "low":
+                logger.info(f"ECON CONSENSUS ({indicator_name}): low confidence — trading with wider sigma={consensus.sigma:.3f}")
 
             # 3. Discover Kalshi markets
             brackets = await _discover_econ_markets(kalshi_client, indicator)
@@ -451,7 +454,7 @@ async def run_econ_consensus_cycle(
                 bracket_probs=bracket_probs,
                 city=indicator_name,
                 bankroll=bankroll,
-                min_edge=0.12,         # Same as weather — require 12% edge
+                min_edge=0.08,         # LOOSENED: lowered from 12% to 8% (more trades qualify)
                 max_position_pct=0.05, # Conservative — 5% max per bracket
                 kelly_fraction=0.30,   # Same as weather
                 rationale_prefix=f"ECON-{indicator_name}({consensus.confidence})",
