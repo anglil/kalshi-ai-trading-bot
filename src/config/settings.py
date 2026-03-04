@@ -28,7 +28,7 @@ class APIConfig:
     api_football_key: str = field(default_factory=lambda: os.getenv("API_FOOTBALL_KEY", ""))
     football_data_key: str = field(default_factory=lambda: os.getenv("FOOTBALL_DATA_KEY", ""))
     openai_base_url: str = "https://api.openai.com/v1"
-    openrouter_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    openrouter_base_url: str = os.getenv("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
 
 
 @dataclass
@@ -37,7 +37,7 @@ class EnsembleConfig:
     enabled: bool = True
     # Model roster: free-tier Gemini models via Google AI Studio
     models: Dict[str, Dict] = field(default_factory=lambda: {
-        "gemini-3-flash-preview": {"provider": "openrouter", "role": "forecaster", "weight": 0.50},
+        "gpt-4.1-mini": {"provider": "openrouter", "role": "forecaster", "weight": 0.50},
         "gemini-2.5-flash": {"provider": "openrouter", "role": "risk_manager", "weight": 0.50},
     })
     min_models_for_consensus: int = 2
@@ -58,7 +58,7 @@ class SentimentConfig:
         "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
         "https://feeds.bbci.co.uk/news/business/rss.xml",
     ])
-    sentiment_model: str = "gemini-3-flash-preview"  # Fast/cheap for sentiment via Google AI Studio
+    sentiment_model: str = "gpt-4.1-mini"  # Via Manus API proxy
     cache_ttl_minutes: int = 30
     max_articles_per_source: int = 10
     relevance_threshold: float = 0.3
@@ -83,7 +83,7 @@ class TradingConfig:
     scan_interval_seconds: int = 30      # DECREASED: Scan more frequently (was 60, now 30)
     
     # AI model configuration
-    primary_model: str = "gemini-3-flash-preview"  # Gemini 3 Flash via Google AI Studio (free)
+    primary_model: str = "gpt-4.1-mini"  # Via Manus API proxy
     fallback_model: str = "gemini-2.5-flash"  # Fallback to Gemini 2.5 Flash (also free)
     ai_temperature: float = 0  # Lower temperature for more consistent JSON output
     ai_max_tokens: int = 8000    # Reasonable limit for reasoning models (grok-4 works better with 8000)

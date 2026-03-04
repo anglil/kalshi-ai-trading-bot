@@ -59,10 +59,12 @@ class XAIClient(TradingLoggerMixin):
         self.api_key = api_key or settings.api.gemini_api_key or settings.api.openrouter_api_key
         self.db_manager = db_manager
         
-        # Initialize OpenAI-compatible client pointing at Google AI Studio
+        # Initialize OpenAI-compatible client — use Manus proxy if available, else Google AI Studio
+        import os
+        _base_url = os.environ.get("OPENAI_BASE_URL", settings.api.openrouter_base_url)
         self.client = AsyncOpenAI(
             api_key=self.api_key,
-            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            base_url=_base_url,
             timeout=120.0,
             max_retries=0,  # We handle retries ourselves
         )
