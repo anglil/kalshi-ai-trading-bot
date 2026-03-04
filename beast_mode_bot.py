@@ -48,6 +48,8 @@ from src.strategies.flu_consensus import run_flu_consensus_cycle
 from src.strategies.nba_consensus import run_nba_consensus_cycle, _is_nba_game_hours
 from src.strategies.soccer_consensus import run_soccer_consensus_cycle
 from src.strategies.follow_the_leader import run_follow_the_leader_cycle
+from src.strategies.fed_rate_consensus import run_fed_rate_consensus_cycle
+from src.strategies.oil_consensus import run_oil_consensus_cycle
 from beast_mode_dashboard import BeastModeDashboard
 
 
@@ -173,6 +175,8 @@ class BeastModeBot:
                 # asyncio.create_task(self._run_flu_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_nba_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_soccer_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_fed_rate_trading(db_manager, kalshi_client)),
+                asyncio.create_task(self._run_oil_trading(db_manager, kalshi_client)),
                 # FTL DISABLED: Strategy is a random penny lottery, not real leader-following.
                 # Kalshi API doesn't expose trader identities or P&L — "leaders" are just large trades.
                 # asyncio.create_task(self._run_follow_the_leader(db_manager, kalshi_client)),
@@ -564,6 +568,70 @@ class BeastModeBot:
                 await asyncio.sleep(3600)
             except Exception as e:
                 self.logger.error(f"Error in soccer trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_fed_rate_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for FOMC rate decision consensus trading (runs every 2 hours)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(100)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                # Fed rate respects general night mode
+                if self._is_night_mode():
+                    self.logger.info("Night mode active — skipping Fed rate trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
+                cycle += 1
+                self.logger.info(f"FED: Starting Fed Rate Trading Cycle #{cycle}")
+                # LIVE: 3 verified sources (FRED, Atlanta Fed MPT, Investing.com)
+                results = await run_fed_rate_consensus_cycle(
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                )
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"FED Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"FED Cycle #{cycle}: No trades this cycle")
+                # Run every 2 hours (FOMC markets move slowly)
+                await asyncio.sleep(7200)
+            except Exception as e:
+                self.logger.error(f"Error in Fed rate trading cycle #{cycle}: {e}")
+                await asyncio.sleep(300)
+
+    async def _run_oil_trading(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
+        """Background task for WTI crude oil consensus trading (runs every 1 hour)."""
+        # Initial delay to let market ingestion finish
+        await asyncio.sleep(110)
+        cycle = 0
+        while not self.shutdown_event.is_set():
+            try:
+                # Oil respects general night mode
+                if self._is_night_mode():
+                    self.logger.info("Night mode active — skipping oil trading cycle")
+                    await asyncio.sleep(300)
+                    continue
+
+                cycle += 1
+                self.logger.info(f"OIL: Starting Oil Price Trading Cycle #{cycle}")
+                # LIVE: 3 verified sources (EIA STEO, Yahoo Finance CL=F, FRED DCOILWTICO)
+                results = await run_oil_consensus_cycle(
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
+                )
+                if results and results.get("orders_placed", 0) > 0:
+                    mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
+                    self.logger.info(
+                        f"OIL Cycle #{cycle} ({mode}): {results['orders_placed']} orders placed"
+                    )
+                else:
+                    self.logger.info(f"OIL Cycle #{cycle}: No trades this cycle")
+                # Run every 1 hour (oil prices move frequently)
+                await asyncio.sleep(3600)
+            except Exception as e:
+                self.logger.error(f"Error in oil trading cycle #{cycle}: {e}")
                 await asyncio.sleep(300)
 
     async def _run_follow_the_leader(self, db_manager: DatabaseManager, kalshi_client: KalshiClient):
