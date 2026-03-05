@@ -550,13 +550,16 @@ async def run_fed_rate_consensus_cycle(
             position_size = min(bankroll * 0.05, 5.0)  # Max $5 per bracket
             signal = WeatherTradeSignal(
                 bracket=bracket,
+                our_prob=our_prob,
+                market_prob=market_yes_price,
+                edge=yes_edge,
+                edge_pct=yes_edge * 100,
                 side="yes",
                 confidence=consensus.confidence,
-                edge=yes_edge,
-                model_prob=our_prob,
                 limit_price=bracket.yes_ask or bracket.yes_price,
                 shares=min(5, max(1, int(position_size / (bracket.yes_ask / 100.0)))) if bracket.yes_ask else 1,
                 position_size_dollars=position_size,
+                city="FED",
                 rationale=(
                     f"FED-RATE({consensus.confidence}): "
                     f"consensus={our_prob:.0%} vs market={market_yes_price:.0%}, "
@@ -570,13 +573,16 @@ async def run_fed_rate_consensus_cycle(
             position_size = min(bankroll * 0.05, 5.0)
             signal = WeatherTradeSignal(
                 bracket=bracket,
+                our_prob=1 - our_prob,
+                market_prob=market_no_price,
+                edge=no_edge,
+                edge_pct=no_edge * 100,
                 side="no",
                 confidence=consensus.confidence,
-                edge=no_edge,
-                model_prob=1 - our_prob,
                 limit_price=bracket.no_ask or bracket.no_price,
                 shares=min(5, max(1, int(position_size / (bracket.no_ask / 100.0)))) if bracket.no_ask else 1,
                 position_size_dollars=position_size,
+                city="FED",
                 rationale=(
                     f"FED-RATE({consensus.confidence}): "
                     f"consensus_no={1-our_prob:.0%} vs market_no={market_no_price:.0%}, "

@@ -69,8 +69,8 @@ class SentimentConfig:
 class TradingConfig:
     """Trading strategy configuration."""
     # Position sizing and risk management - MADE MORE AGGRESSIVE  
-    max_position_size_pct: float = 5.0  # INCREASED: Back to 5% per position (was 3%)
-    max_daily_loss_pct: float = 15.0    # INCREASED: Allow 15% daily loss (was 10%) 
+    max_position_size_pct: float = 7.5  # INCREASED: 7.5% per position for more aggressive trading
+    max_daily_loss_pct: float = 20.0    # INCREASED: Allow 20% daily loss for more aggressive trading 
     max_positions: int = 20              # INCREASED: Allow 20 concurrent positions (6 strategies)
     min_balance: float = 50.0           # REDUCED: Lower minimum to trade more (was 100)
     
@@ -94,14 +94,14 @@ class TradingConfig:
     
     # Kelly Criterion settings (PRIMARY position sizing method) - MORE AGGRESSIVE
     use_kelly_criterion: bool = True        # Use Kelly Criterion for position sizing (PRIMARY METHOD)
-    kelly_fraction: float = 0.75            # INCREASED: More aggressive Kelly multiplier (was 0.5, now 0.75)
+    kelly_fraction: float = 0.90            # INCREASED: More aggressive Kelly multiplier (0.90 for bigger bets)
     max_single_position: float = 0.05       # INCREASED: Higher position cap (was 0.03, now 5%)
     
     # Trading frequency - MORE FREQUENT
     market_scan_interval: int = 30          # DECREASED: Scan every 30 seconds (was 60)
     position_check_interval: int = 15       # DECREASED: Check positions every 15 seconds (was 30)
     max_trades_per_hour: int = 20           # INCREASED: Allow more trades per hour (was 10, now 20)
-    run_interval_minutes: int = 10          # DECREASED: Run more frequently (was 15, now 10)
+    run_interval_minutes: int = 5           # DECREASED: Run every 5 minutes for more frequent scanning
     num_processor_workers: int = 5      # Number of concurrent market processor workers
     
     # Market selection preferences
@@ -121,7 +121,7 @@ class TradingConfig:
     # Cost control and market analysis frequency - MORE PERMISSIVE
     daily_ai_budget: float = 10.0  # INCREASED: Higher daily budget (was 5.0, now 10.0)
     max_ai_cost_per_decision: float = 0.08  # INCREASED: Higher per-decision cost (was 0.05, now 0.08)
-    analysis_cooldown_hours: int = 3  # DECREASED: Shorter cooldown (was 6, now 3)
+    analysis_cooldown_hours: int = 1  # DECREASED: 1 hour cooldown for more frequent re-analysis
     max_analyses_per_market_per_day: int = 4  # INCREASED: More analyses per day (was 2, now 4)
     
     # Daily AI spending limits - SAFETY CONTROLS
@@ -130,7 +130,7 @@ class TradingConfig:
     sleep_when_limit_reached: bool = True  # Sleep until next day when limit reached
 
     # Night mode - pause new trade entry during low-liquidity overnight hours
-    night_mode_enabled: bool = True         # Enable night mode to stop new trades at night
+    night_mode_enabled: bool = False        # DISABLED: Trade 24/7 for maximum aggressiveness
     night_mode_start_hour: int = 23         # Hour (0-23) in US/Eastern when night mode starts (11 PM)
     night_mode_end_hour: int = 7            # Hour (0-23) in US/Eastern when night mode ends (7 AM)
 

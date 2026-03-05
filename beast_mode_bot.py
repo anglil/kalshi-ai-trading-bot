@@ -75,9 +75,9 @@ class BeastModeBot:
         self.logger = get_trading_logger("beast_mode_bot")
         self.shutdown_event = asyncio.Event()
         
-        # AI directional always paper — consensus strategies manage their own mode
-        settings.trading.live_trading_enabled = False
-        settings.trading.paper_trading_mode = True
+        # AI directional now respects --live flag
+        settings.trading.live_trading_enabled = live_mode
+        settings.trading.paper_trading_mode = not live_mode
         
         self.logger.info(
             f"🚀 Beast Mode Bot initialized - "
@@ -177,9 +177,8 @@ class BeastModeBot:
                 asyncio.create_task(self._run_soccer_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_fed_rate_trading(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_oil_trading(db_manager, kalshi_client)),
-                # FTL DISABLED: Strategy is a random penny lottery, not real leader-following.
-                # Kalshi API doesn't expose trader identities or P&L — "leaders" are just large trades.
-                # asyncio.create_task(self._run_follow_the_leader(db_manager, kalshi_client)),
+                # FTL re-enabled for more aggressive trading
+                asyncio.create_task(self._run_follow_the_leader(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_trading_cycles(db_manager, kalshi_client, xai_client)),
                 asyncio.create_task(self._run_position_tracking(db_manager, kalshi_client)),
                 asyncio.create_task(self._run_performance_evaluation(db_manager))
@@ -433,8 +432,8 @@ class BeastModeBot:
 
                 cycle += 1
                 self.logger.info(f"⛽ Starting Gas Price Trading Cycle #{cycle}")
-                # Gas stays paper until 3rd source is fixed (only 2 sources: FRED/EIA + EIA Public, AAA broken)
-                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=True)
+                # Gas now respects --live flag
+                results = await run_gas_consensus_cycle(kalshi_client, db_manager, paper_mode=not self.live_mode)
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
                     self.logger.info(
@@ -521,9 +520,9 @@ class BeastModeBot:
 
                 cycle += 1
                 self.logger.info(f"NBA: Starting NBA Trading Cycle #{cycle}")
-                # NBA stays paper until 3rd source is added (only 2 sources: ESPN BPI + Elo)
+                # NBA now respects --live flag
                 results = await run_nba_consensus_cycle(
-                    kalshi_client, db_manager, paper_mode=True,
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
                 )
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"
@@ -553,9 +552,9 @@ class BeastModeBot:
 
                 cycle += 1
                 self.logger.info(f"Soccer: Starting Soccer Trading Cycle #{cycle}")
-                # Soccer stays paper until 2nd+ source is added (only 1 source: Elo)
+                # Soccer now respects --live flag
                 results = await run_soccer_consensus_cycle(
-                    kalshi_client, db_manager, paper_mode=True,
+                    kalshi_client, db_manager, paper_mode=not self.live_mode,
                 )
                 if results and results.get("orders_placed", 0) > 0:
                     mode = "PAPER" if results.get("paper_mode", True) else "LIVE"

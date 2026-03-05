@@ -58,14 +58,14 @@ async def process_and_queue_markets(
         logger.info(f"Successfully upserted {len(markets_to_upsert)} markets.")
 
         # Primary filtering criteria - MORE PERMISSIVE FOR MORE OPPORTUNITIES!
-        min_volume: float = 100.0  # DECREASED: Much lower volume threshold (was 100, keeping low)
+        min_volume: float = 50.0  # DECREASED: Even lower volume threshold for more market coverage
         min_volume_for_ai_analysis: float = 150.0  # DECREASED: Lower volume for AI analysis (was 200, now 150)  
         preferred_categories: List[str] = []  # Empty = all categories allowed
         excluded_categories: List[str] = []  # Empty = no categories excluded
 
         # Enhanced filtering for better opportunities - MORE PERMISSIVE FOR MORE TRADES
         min_price_movement: float = 0.015  # DECREASED: Even lower minimum range (was 0.02, now 1.5¢)
-        max_bid_ask_spread: float = 0.20   # INCREASED: Allow even wider spreads (was 0.15, now 20¢)
+        max_bid_ask_spread: float = 0.25   # INCREASED: Allow wider spreads (25¢) for more opportunities
         min_confidence_for_long_term: float = 0.40  # DECREASED: Lower confidence required (was 0.5, now 40%)
 
         eligible_markets = [
