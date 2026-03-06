@@ -157,13 +157,13 @@ def compute_consensus(forecast: MultiSourceForecast) -> ConsensusResult:
     # Map ratio to sigma and confidence label
     # Priority 5: Calibrate sigma upward — our forecast is less precise than we thought
     if agreement_ratio >= 0.80:
-        sigma = 4.0   # TURNAROUND v3: Was 2.5 — still too tight
+        sigma = 6.0   # v4: Was 4.0 — increased to reduce NO-side overconfidence
         confidence = "high"
     elif agreement_ratio >= 0.60:
-        sigma = 5.0   # TURNAROUND v3: Was 3.5
+        sigma = 7.0   # v4: Was 5.0
         confidence = "medium"
     else:
-        sigma = 7.0   # TURNAROUND v3: Was 5.0
+        sigma = 9.0   # v4: Was 7.0
         confidence = "low"
 
     # Time-of-day adjustment: forecasts are less certain early in the morning
@@ -217,11 +217,11 @@ async def _nws_fallback_for_city(
 
     hour = datetime.now().hour
     if hour >= 10:
-        sigma = 4.0   # TURNAROUND v3: Was 3.0
+        sigma = 6.0   # v4: Was 4.0 — increased to reduce NO-side overconfidence
     elif hour >= 6:
-        sigma = 5.0   # TURNAROUND v3: Was 3.5
+        sigma = 7.0   # v4: Was 5.0
     else:
-        sigma = 6.0   # TURNAROUND v3: Was 4.5
+        sigma = 8.0   # v4: Was 6.0
 
     bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
     return generate_weather_signals(

@@ -359,12 +359,52 @@ class PositionLimitsManager:
             return 0.0
     
     async def _close_position(self, candidate: PositionToClose) -> bool:
-        """Close a position by selling on Kalshi, then mark as closed in database."""
+        """Close a position by selling on Kalshi at a smart price, then mark as closed in database.
+        
+        v4: Replaced fire-sale (1 cent) logic with smart limit orders that
+        fetch the current market price and sell at a small discount (10%) to
+        get a reasonable fill without giving away the position.
+        """
         try:
             import uuid
 
-            # Build sell order — sell at 1 cent (worst price) to ensure fill like a market order
             side_lower = candidate.side.lower()
+
+            # --- Smart pricing: fetch current market data ---
+            sell_price_cents = None
+            try:
+                market_data = await self.kalshi_client.get_market(candidate.market_id)
+                md = market_data.get('market', {})
+
+                if side_lower == 'yes':
+                    # For selling YES, use the best bid (yes_bid) or last trade price
+                    best_bid = md.get('yes_bid') or md.get('yes_price') or 0
+                else:
+                    # For selling NO, use the best bid (no_bid) or last trade price
+                    best_bid = md.get('no_bid') or md.get('no_price') or 0
+
+                if best_bid and best_bid > 0:
+                    # Sell at 10% discount from best bid to improve fill probability
+                    sell_price_cents = max(2, int(best_bid * 0.90))
+                    self.logger.info(
+                        f"Smart exit {candidate.market_id}: best_bid={best_bid}c, "
+                        f"selling at {sell_price_cents}c (10% discount)"
+                    )
+                else:
+                    # No bid available — use a floor of 5 cents instead of 1 cent
+                    sell_price_cents = 5
+                    self.logger.warning(
+                        f"No bid for {candidate.market_id}, using floor price {sell_price_cents}c"
+                    )
+            except Exception as price_err:
+                # If we can't get market data, use a conservative floor
+                sell_price_cents = 5
+                self.logger.warning(
+                    f"Could not fetch market price for {candidate.market_id}: {price_err}. "
+                    f"Using floor price {sell_price_cents}c"
+                )
+
+            # --- Build and place the sell order ---
             order_kwargs = {
                 "ticker": candidate.market_id,
                 "client_order_id": str(uuid.uuid4()),
@@ -373,16 +413,15 @@ class PositionLimitsManager:
                 "count": candidate.quantity,
                 "type_": "limit",
             }
-            # Set price to 1 cent on our side (worst case = guaranteed fill)
             if side_lower == "yes":
-                order_kwargs["yes_price"] = 1
+                order_kwargs["yes_price"] = sell_price_cents
             else:
-                order_kwargs["no_price"] = 1
+                order_kwargs["no_price"] = sell_price_cents
 
             try:
                 order_response = await self.kalshi_client.place_order(**order_kwargs)
                 self.logger.info(
-                    f"Position {candidate.market_id} sold on Kalshi: {order_response}"
+                    f"\u2705 Position {candidate.market_id} sold on Kalshi at {sell_price_cents}c: {order_response}"
                 )
             except Exception as sell_err:
                 self.logger.warning(
@@ -394,7 +433,7 @@ class PositionLimitsManager:
             # Update position status to closed only after successful sell
             await self.db_manager.update_position_status(candidate.position_id, "closed")
 
-            self.logger.info(f"Position {candidate.market_id} closed due to position limits")
+            self.logger.info(f"Position {candidate.market_id} closed due to position limits (smart exit at {sell_price_cents}c)")
             
             return True
             

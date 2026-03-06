@@ -109,7 +109,7 @@ def _normal_cdf(x: float) -> float:
 def forecast_to_bracket_probs(
     forecast_high: float,
     brackets: List[TemperatureBracket],
-    sigma: float = 5.0,
+    sigma: float = 7.0,
     normalize: bool = True,
 ) -> Dict[str, float]:
     """
@@ -120,9 +120,9 @@ def forecast_to_bracket_probs(
     with standard deviation sigma (historical forecast error). The probability
     of each bracket is the integral of the normal PDF over the bracket range.
     
-    TURNAROUND v3: Default sigma raised to 5.0 (was 3.0). Historical data
-    showed the model was overconfident, assigning <1% to events that happened
-    frequently. Wider sigma = more honest uncertainty = fewer bad bets.
+    TURNAROUND v4: Default sigma raised to 7.0 (was 5.0, originally 3.0).
+    Historical data showed the model was still overconfident on NO positions,
+    leading to systematic losses. Wider sigma = more honest uncertainty.
     """
     probs = {}
     for bracket in brackets:
@@ -670,11 +670,11 @@ async def run_weather_trading_cycle(
             # because bracket boundaries create cliff effects
             current_hour = datetime.now().hour
             if current_hour >= 10:
-                sigma = 4.0   # Was 2.0 — doubled for calibration
+                sigma = 6.0   # v4: Was 4.0 — increased to reduce NO-side overconfidence
             elif current_hour >= 6:
-                sigma = 5.0   # Was 2.5
+                sigma = 7.0   # v4: Was 5.0
             else:
-                sigma = 6.0   # Was 3.5
+                sigma = 8.0   # v4: Was 6.0
             
             bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
             
