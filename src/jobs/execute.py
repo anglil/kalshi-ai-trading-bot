@@ -188,7 +188,7 @@ async def place_sell_limit_order(
             "side": side,
             "action": "sell",  # We're selling our existing position
             "count": position.quantity,
-            "type": "limit"
+            "type_": "limit"
         }
         
         # Add the appropriate price parameter based on what we're selling

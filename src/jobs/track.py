@@ -235,6 +235,37 @@ async def run_tracking(db_manager: Optional[DatabaseManager] = None):
                         f"Entry: {position.entry_price:.3f}, Exit: {exit_price:.3f}"
                     )
                     
+                    # === FIX: Place a REAL sell order on Kalshi before marking as closed ===
+                    # For market_resolution, no sell needed — Kalshi settles automatically
+                    if exit_reason == "market_resolution":
+                        sell_success = True
+                        logger.info(f"Market {position.market_id} resolved — no sell order needed, Kalshi settles automatically.")
+                    else:
+                        # Place a sell order on Kalshi to actually close the position
+                        from src.jobs.execute import place_sell_limit_order
+                        # Use exit_price with a small discount to ensure execution
+                        sell_price = exit_price * 0.95 if position.side.upper() == 'YES' else exit_price * 1.05
+                        # Clamp to valid range [0.01, 0.99]
+                        sell_price = max(0.01, min(0.99, sell_price))
+                        
+                        logger.info(
+                            f"Placing SELL order on Kalshi for {position.market_id}: "
+                            f"{position.quantity} {position.side} @ {sell_price:.2f} (reason: {exit_reason})"
+                        )
+                        sell_success = await place_sell_limit_order(
+                            position=position,
+                            limit_price=sell_price,
+                            db_manager=db_manager,
+                            kalshi_client=kalshi_client
+                        )
+                    
+                    if not sell_success:
+                        logger.error(
+                            f"SELL ORDER FAILED for {position.market_id} — "
+                            f"keeping position OPEN in DB to retry next cycle."
+                        )
+                        continue  # Do NOT mark as closed if sell failed
+                    
                     # Calculate PnL — must account for position side
                     if position.side.upper() == 'YES':
                         pnl = (exit_price - position.entry_price) * position.quantity
@@ -255,13 +286,13 @@ async def run_tracking(db_manager: Optional[DatabaseManager] = None):
                         strategy=getattr(position, 'strategy', None),
                     )
 
-                    # Record the exit
+                    # Record the exit — only after sell order confirmed
                     await db_manager.add_trade_log(trade_log)
                     await db_manager.update_position_status(position.id, 'closed')
                     
                     exits_executed += 1
                     logger.info(
-                        f"Position for market {position.market_id} closed via {exit_reason}. "
+                        f"Position for market {position.market_id} SOLD and closed via {exit_reason}. "
                         f"PnL: ${pnl:.2f}"
                     )
                 else:
