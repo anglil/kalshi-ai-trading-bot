@@ -38,14 +38,14 @@ logger = get_trading_logger("weather_consensus")
 # Risk management constants
 # ============================================================
 
-MAX_POSITIONS_PER_CITY = 1       # FIX #2: Only 1 bracket per city-date — eliminates extra losing brackets
+MAX_POSITIONS_PER_CITY = 2       # CHEAP SHOTS v5: 2 per city (cheap bets, diversified)
 BRACKET_OVERLAP_THRESHOLD = 4    # °F — brackets within this range are "overlapping"
-MAX_DAILY_LOSSES_PER_CITY = 3    # DOUBLE DOWN: increased from 2 (allow more attempts)
-MIN_EDGE_THRESHOLD = 0.08        # LOOSENED: lowered from 12% to 8% (more trades qualify)
-KELLY_FRACTION = 0.30            # DOUBLE DOWN: increased from 0.20 (bigger bets on winners)
-MAX_POSITION_PCT = 0.05          # DOUBLE DOWN: increased from 3% to 5% per bracket
-MAX_SHARES_PER_TRADE = 8         # DOUBLE DOWN: increased from 3 to 8 (bigger positions)
-WEATHER_TRADING_PAUSED = False   # Active — weather is our #1 profit driver
+MAX_DAILY_LOSSES_PER_CITY = 3    # Allow 3 attempts per city per day
+MIN_EDGE_THRESHOLD = 0.08        # Low edge OK for cheap contracts (capped downside)
+KELLY_FRACTION = 0.40            # CHEAP SHOTS v5: aggressive Kelly on cheap bets
+MAX_POSITION_PCT = 0.06          # CHEAP SHOTS v5: 6% per bracket (each trade is small $)
+MAX_SHARES_PER_TRADE = 10        # CHEAP SHOTS v5: 10 shares max (10 x 25c = $2.50 max)
+WEATHER_TRADING_PAUSED = False   # Active
 
 
 # ============================================================
@@ -157,19 +157,19 @@ def compute_consensus(forecast: MultiSourceForecast) -> ConsensusResult:
     # Map ratio to sigma and confidence label
     # Priority 5: Calibrate sigma upward — our forecast is less precise than we thought
     if agreement_ratio >= 0.80:
-        sigma = 6.0   # v4: Was 4.0 — increased to reduce NO-side overconfidence
+        sigma = 9.0   # CHEAP SHOTS v5: Wide sigma for tail-event signals
         confidence = "high"
     elif agreement_ratio >= 0.60:
-        sigma = 7.0   # v4: Was 5.0
+        sigma = 10.0  # v5: Wide even for medium consensus
         confidence = "medium"
     else:
-        sigma = 9.0   # v4: Was 7.0
+        sigma = 12.0  # v5: Very wide for low consensus
         confidence = "low"
 
     # Time-of-day adjustment: forecasts are less certain early in the morning
     hour = datetime.now().hour
     if hour < 6:
-        sigma += 2.0   # TURNAROUND v3: bigger early-morning penalty
+        sigma += 2.0   # Early-morning penalty
     elif hour < 10:
         sigma += 1.0
 
@@ -217,11 +217,11 @@ async def _nws_fallback_for_city(
 
     hour = datetime.now().hour
     if hour >= 10:
-        sigma = 6.0   # v4: Was 4.0 — increased to reduce NO-side overconfidence
+        sigma = 9.0   # CHEAP SHOTS v5: Wide sigma for tail events
     elif hour >= 6:
-        sigma = 7.0   # v4: Was 5.0
+        sigma = 10.0  # v5
     else:
-        sigma = 8.0   # v4: Was 6.0
+        sigma = 11.0  # v5
 
     bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
     return generate_weather_signals(
@@ -286,8 +286,8 @@ async def run_consensus_weather_cycle(
         return results
 
     # Priority 3: Cap weather exposure at 30% of total portfolio
-    WEATHER_EXPOSURE_CAP = 0.50  # DOUBLE DOWN: Max 50% of portfolio for weather (was 30%)
-    DAILY_DEPLOYMENT_LIMIT = 50.0  # Max $50/day in new weather buys
+    WEATHER_EXPOSURE_CAP = 0.30  # CHEAP SHOTS v5: 30% cap (each trade is cheap)
+    DAILY_DEPLOYMENT_LIMIT = 30.0  # Max $30/day in new weather buys
     
     # Check ACTUAL weather exposure from Kalshi API (not just bankroll calculation)
     try:
@@ -416,7 +416,7 @@ async def run_consensus_weather_cycle(
 
     # Sort by edge, take top opportunities
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 4  # 1 bracket per city x 4 cities = max 4 trades per cycle
+    max_trades = 8  # CHEAP SHOTS v5: 2 brackets per city x 4 cities = max 8 per cycle
 
     # Filter out signals for tickers where we already hold a position
     # Use KALSHI API as source of truth (not just local DB which may be incomplete)

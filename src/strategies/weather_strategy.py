@@ -13,10 +13,11 @@ Key concepts:
 - Settlement is based on NWS Daily Climate Report (next morning)
 - We use limit orders to minimize fees (taker fee = 0.07 * P * (1-P))
 
-TURNAROUND v3: Only bet on the 1-2 brackets CLOSEST to the forecast.
-Historical data shows the big wins came from "obvious" brackets (e.g.
-Chicago >40F in Feb, Miami >65F) bought at 10-50c. The losses came from
-spreading capital across 10+ brackets, most of which expired worthless.
+CHEAP SHOTS v5: INVERTED from v3 based on real P&L data.
+Data showed cheap bets (<=20c) had 71% win rate, expensive (>50c) had 8%.
+v3 was filtering OUT all the winners by requiring MIN 30c entry.
+New approach: ONLY buy cheap contracts (3-25c) with high upside, capped downside.
+Aggressive sell-ASAP: take profit at entry + 5c absolute.
 """
 
 import asyncio
@@ -109,7 +110,7 @@ def _normal_cdf(x: float) -> float:
 def forecast_to_bracket_probs(
     forecast_high: float,
     brackets: List[TemperatureBracket],
-    sigma: float = 7.0,
+    sigma: float = 10.0,
     normalize: bool = True,
 ) -> Dict[str, float]:
     """
@@ -120,9 +121,9 @@ def forecast_to_bracket_probs(
     with standard deviation sigma (historical forecast error). The probability
     of each bracket is the integral of the normal PDF over the bracket range.
     
-    TURNAROUND v4: Default sigma raised to 7.0 (was 5.0, originally 3.0).
-    Historical data showed the model was still overconfident on NO positions,
-    leading to systematic losses. Wider sigma = more honest uncertainty.
+    CHEAP SHOTS v5: Default sigma raised to 10.0 (was 7.0).
+    Very wide uncertainty to generate more tail-event signals on cheap contracts.
+    Markets tend to underprice tail events (behavioral bias we exploit).
     """
     probs = {}
     for bracket in brackets:
@@ -266,15 +267,16 @@ def _parse_bracket_from_market(market: dict) -> Optional[TemperatureBracket]:
 # Signal generation — TURNAROUND v3
 # ============================================================
 
-# TURNAROUND v3: Minimum entry price raised to 30c.
-# Historical data: 0-15c contracts had -57% ROI, 15-30c had -43% ROI.
-# Only 30c+ contracts have a chance of being profitable.
-MIN_ENTRY_PRICE_CENTS = 30
+# CHEAP SHOTS v5: INVERTED from v3 based on real P&L data.
+# Data showed: cheap bets (<=20c) had 71% win rate, expensive (>50c) had 8%.
+# The old MIN_ENTRY of 30c was filtering out ALL the winners.
+# New approach: only buy cheap contracts with high upside and capped downside.
+MIN_ENTRY_PRICE_CENTS = 3    # Reject penny contracts with no liquidity
+MAX_ENTRY_PRICE_CENTS = 25   # Reject expensive contracts (the systematic losers)
 
-# FIX #2: Only 1 bracket per city-date — the single most extreme "obvious NO".
-# Data shows 3-4 brackets per city = 1 winner + 2-3 losers bleeding cash.
-# Picking only the best bracket eliminates the extra losing brackets.
-MAX_BRACKETS_PER_CITY = 1
+# CHEAP SHOTS v5: Allow 2 brackets per city for diversification.
+# With cheap contracts, even 2 losers cost less than 1 expensive loser.
+MAX_BRACKETS_PER_CITY = 2
 
 
 def _bracket_distance_to_forecast(bracket: TemperatureBracket, forecast: float) -> float:
@@ -303,7 +305,7 @@ def generate_weather_signals(
     bracket_probs: Dict[str, float],
     city: str,
     bankroll: float,
-    min_edge: float = 0.15,
+    min_edge: float = 0.08,
     max_position_pct: float = 0.03,
     kelly_fraction: float = 0.25,
     rationale_prefix: str = "WEATHER",
@@ -397,12 +399,18 @@ def generate_weather_signals(
         if entry_price_dollars <= 0:
             continue
         
-        # TURNAROUND v3: Minimum price floor at 30c (was 15c)
-        # Historical data: 0-30c contracts have negative ROI across the board
+        # CHEAP SHOTS v5: Only buy cheap contracts (3-25c)
+        # Data shows cheap bets have 71% win rate, expensive have 8%
         if entry_price_cents < MIN_ENTRY_PRICE_CENTS:
             logger.debug(
                 f"PRICE FLOOR: Skip {bracket.ticker} {side} @ {entry_price_cents}c "
                 f"(min {MIN_ENTRY_PRICE_CENTS}c)"
+            )
+            continue
+        if entry_price_cents > MAX_ENTRY_PRICE_CENTS:
+            logger.debug(
+                f"PRICE CAP: Skip {bracket.ticker} {side} @ {entry_price_cents}c "
+                f"(max {MAX_ENTRY_PRICE_CENTS}c — too expensive, systematic loser)"
             )
             continue
         
@@ -410,16 +418,15 @@ def generate_weather_signals(
         shares = min(shares, max_shares)
         actual_position = shares * entry_price_dollars
         
-        # Set limit price: maker-friendly (2c below ask)
+        # CHEAP SHOTS v5: For cheap contracts, bid at ask or 1c below
+        # Don't try to be too clever with limit prices on cheap contracts
         if side == "YES":
-            limit_price = min(entry_price_cents - 2, int(our_prob * 100) - 2)
-            limit_price = max(MIN_ENTRY_PRICE_CENTS, limit_price)
+            limit_price = max(MIN_ENTRY_PRICE_CENTS, entry_price_cents - 1)
         else:
-            limit_price = min(entry_price_cents - 2, int((1 - our_prob) * 100) - 2)
-            limit_price = max(MIN_ENTRY_PRICE_CENTS, limit_price)
+            limit_price = max(MIN_ENTRY_PRICE_CENTS, entry_price_cents - 1)
         
-        # Reject dead orders — if limit is more than 30% below market ask
-        if limit_price < entry_price_cents * 0.50:
+        # Reject dead orders — if limit is less than 3c
+        if limit_price < MIN_ENTRY_PRICE_CENTS:
             continue
         
         # Build bracket description
@@ -480,8 +487,8 @@ async def execute_weather_trade(
     """
     try:
         # === CAPITAL PROTECTION ===
-        # DOUBLE DOWN: Lowered from $50 to $20 for weather (our top earner needs to trade)
-        MIN_CASH_TO_TRADE = 20.0
+        # CHEAP SHOTS v5: Lowered to $5 since each trade costs $0.30-$2.50
+        MIN_CASH_TO_TRADE = 5.0
         try:
             bal_resp = await kalshi_client.get_balance()
             available_cash = bal_resp.get('balance', 0) / 100.0
@@ -553,15 +560,17 @@ async def execute_weather_trade(
             order_id = order_response["order"].get("order_id", client_order_id)
             
             entry_dollars = signal.limit_price / 100.0
-            # Side-aware stop-loss and take-profit levels
-            # Take-profit is TIGHT: sell as soon as ~10% profitable (fees are ~3-4%)
-            # Stop-loss is moderate: cut losses at ~25% to limit downside
+            # CHEAP SHOTS v5: Absolute cent-based TP/SL for cheap contracts
+            # Take-profit: entry + 5c (captures drift toward resolution)
+            # Stop-loss: 1c (let it expire worthless rather than sell at a loss)
+            # For a 10c contract: TP=15c (50% gain), SL=1c (90% max loss = 9c)
+            # For a 20c contract: TP=25c (25% gain), SL=1c (95% max loss = 19c)
             if signal.side == "YES":
-                sl_price = max(0.02, round(entry_dollars * 0.75, 2))   # 25% stop loss
-                tp_price = min(0.95, round(entry_dollars * 1.10, 2))   # 10% take profit
+                sl_price = 0.01   # Let it expire worthless
+                tp_price = min(0.95, round(entry_dollars + 0.05, 2))   # +5c absolute
             else:  # NO side
-                sl_price = min(0.99, round(entry_dollars * 1.25, 2))   # 25% stop loss
-                tp_price = max(0.02, round(entry_dollars * 0.90, 2))   # 10% take profit
+                sl_price = min(0.99, round(entry_dollars + 0.05, 2))   # +5c above entry (loss for NO)
+                tp_price = max(0.01, round(entry_dollars - 0.05, 2))   # -5c below entry (profit for NO)
             position = Position(
                 market_id=signal.bracket.ticker,
                 side=signal.side,
@@ -625,8 +634,9 @@ async def run_weather_trading_cycle(
         logger.error(f"Could not fetch balance: {e}")
         return results
     
-    # DOUBLE DOWN: Weather gets 50% of portfolio (was 30%) — it's our top earner
-    weather_bankroll = bankroll * 0.50
+    # CHEAP SHOTS v5: Weather gets 30% of portfolio (reduced from 50%)
+    # Each trade is cheap ($0.30-$2.50) so we don't need as much capital
+    weather_bankroll = bankroll * 0.30
     
     if weather_bankroll < 5.0:
         logger.warning(f"Insufficient weather bankroll: ${weather_bankroll:.2f}")
@@ -665,30 +675,31 @@ async def run_weather_trading_cycle(
             
             logger.info(f"{station.city}: {len(brackets)} active brackets")
             
-            # TURNAROUND v3: Use wider sigma for honest uncertainty
-            # Historical NWS error is 3-5F, but our model needs extra buffer
-            # because bracket boundaries create cliff effects
+            # CHEAP SHOTS v5: Very wide sigma to generate more tail-event signals.
+            # With cheap contracts, we WANT the model to assign higher probability
+            # to tail events than the market does (known behavioral bias).
+            # Wider sigma = more edge on cheap YES contracts.
             current_hour = datetime.now().hour
             if current_hour >= 10:
-                sigma = 6.0   # v4: Was 4.0 — increased to reduce NO-side overconfidence
+                sigma = 9.0   # v5: Was 6.0 — wide for tail events
             elif current_hour >= 6:
-                sigma = 7.0   # v4: Was 5.0
+                sigma = 10.0  # v5: Was 7.0
             else:
-                sigma = 8.0   # v4: Was 6.0
+                sigma = 11.0  # v5: Was 8.0
             
             bracket_probs = forecast_to_bracket_probs(forecast_high, brackets, sigma=sigma)
             
-            # TURNAROUND v3: Pass forecast_high so signals are filtered to closest brackets
-            # DOUBLE DOWN: Bigger bets, lower edge threshold, more shares
+            # CHEAP SHOTS v5: Lower edge threshold, more shares on cheap contracts
+            # Max risk per trade = 10 shares × 25c = $2.50 (very manageable)
             city_signals = generate_weather_signals(
                 brackets=brackets,
                 bracket_probs=bracket_probs,
                 city=station.city,
                 bankroll=weather_bankroll,
-                min_edge=0.12,
-                max_position_pct=0.05,
-                kelly_fraction=0.30,
-                max_shares=8,
+                min_edge=0.08,
+                max_position_pct=0.06,
+                kelly_fraction=0.40,
+                max_shares=10,
                 forecast_high=forecast_high,
             )
             
@@ -711,9 +722,9 @@ async def run_weather_trading_cycle(
         logger.info("No weather trade signals generated this cycle")
         return results
     
-    # Sort all signals by edge and take top 2 only
+    # CHEAP SHOTS v5: More trades allowed since each is cheap (max $2.50)
     all_signals.sort(key=lambda s: s.edge, reverse=True)
-    max_trades = 4  # 1 bracket per city x 4 cities = max 4 trades per cycle
+    max_trades = 8  # 2 brackets per city x 4 cities = max 8 trades per cycle
     
     logger.info(f"Top weather signals ({len(all_signals)} total):")
     for i, sig in enumerate(all_signals[:max_trades]):
