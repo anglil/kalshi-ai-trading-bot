@@ -316,29 +316,23 @@ def generate_weather_signals(
     Generate trade signals by comparing our probability estimates
     to market prices.
     
-    TURNAROUND v3 changes:
-    - Only consider the 2 brackets closest to the forecast
-    - Minimum entry price raised to 30c (was 15c)
-    - Stronger edge requirement (15% minimum)
-    - Smaller position sizes (quarter Kelly, 3% max)
+    CHEAP SHOTS v5:
+    - Buy only cheap contracts (3-25c) for capped downside
+    - Wide sigma for tail-event signals
+    - No closest-bracket filter (price filter handles it)
+    - Aggressive sell-ASAP at entry + 5c
     """
     signals = []
     
-    # TURNAROUND v3: If we have the forecast, pre-filter to only the
-    # closest brackets. This prevents the "spray and pray" approach
-    # that lost $248 across dozens of tail brackets.
+    # CHEAP SHOTS v5: Closest-bracket filter DISABLED.
+    # The 3-25c price filter already ensures we only buy cheap tail contracts.
+    # The old closest-bracket filter was killing good signals by only looking
+    # at brackets near the forecast temp, which are all resolved (1c) or expensive (76c+).
+    # The cheap contracts for tomorrow's markets are far from today's forecast.
     if forecast_high is not None:
-        # Sort brackets by distance to forecast
-        brackets_with_dist = [
-            (b, _bracket_distance_to_forecast(b, forecast_high))
-            for b in brackets
-        ]
-        brackets_with_dist.sort(key=lambda x: x[1])
-        # Only consider the N closest brackets
-        brackets = [b for b, d in brackets_with_dist[:MAX_BRACKETS_PER_CITY * 3]]
         logger.info(
-            f"TURNAROUND: {city} — filtered to {len(brackets)} closest brackets "
-            f"(forecast={forecast_high:.0f}F)"
+            f"CHEAP SHOTS: {city} — scanning ALL {len(brackets)} brackets "
+            f"(forecast={forecast_high:.0f}F, price filter={MIN_ENTRY_PRICE_CENTS}-{MAX_ENTRY_PRICE_CENTS}c)"
         )
     
     for bracket in brackets:
