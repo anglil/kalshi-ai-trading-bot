@@ -222,18 +222,67 @@ async def place_sell_limit_order(
         return False
 
 
+def calculate_kalshi_fee(contracts: int, price: float) -> float:
+    """
+    Calculate Kalshi taker fee for a trade.
+    Formula: round_up(0.07 × C × P × (1-P))
+    
+    Args:
+        contracts: Number of contracts
+        price: Price per contract in dollars (0-1)
+    Returns:
+        Fee in dollars
+    """
+    import math
+    if price <= 0 or price >= 1:
+        return 0.01 * contracts  # Minimum fee
+    raw_fee = 0.07 * contracts * price * (1 - price)
+    return math.ceil(raw_fee * 100) / 100  # Round up to nearest cent
+
+
+def calculate_breakeven_sell_price(entry_price: float, quantity: int, side: str) -> float:
+    """
+    Calculate the minimum sell price needed to break even after round-trip fees.
+    
+    Args:
+        entry_price: Entry price in dollars (0-1)
+        quantity: Number of contracts
+        side: 'YES' or 'NO'
+    Returns:
+        Breakeven sell price in dollars
+    """
+    buy_fee = calculate_kalshi_fee(quantity, entry_price)
+    # Estimate sell fee at roughly the same price (conservative)
+    sell_fee = calculate_kalshi_fee(quantity, entry_price)
+    total_fees = buy_fee + sell_fee
+    # Fee per contract
+    fee_per_contract = total_fees / quantity
+    
+    if side.upper() == 'YES':
+        # YES: need price to rise above entry + fees
+        breakeven = entry_price + fee_per_contract
+    else:
+        # NO: need price to drop below entry - fees
+        breakeven = entry_price - fee_per_contract
+    
+    return breakeven
+
+
 async def place_profit_taking_orders(
     db_manager: DatabaseManager,
     kalshi_client: KalshiClient,
-    profit_threshold: float = 0.25  # 25% profit target
+    profit_threshold: float = 0.05  # 5% minimum profit after fees
 ) -> Dict[str, int]:
     """
-    Place sell limit orders for positions that have reached profit targets.
+    Place sell limit orders as soon as positions are profitable past fees.
+    
+    Uses Kalshi's fee formula to calculate the exact breakeven point,
+    then sells once profit exceeds fees + a small buffer (profit_threshold).
     
     Args:
         db_manager: Database manager
         kalshi_client: Kalshi API client
-        profit_threshold: Minimum profit percentage to trigger sell order
+        profit_threshold: Minimum profit percentage ABOVE breakeven to trigger sell
     
     Returns:
         Dictionary with results: {'orders_placed': int, 'positions_processed': int}
@@ -250,13 +299,12 @@ async def place_profit_taking_orders(
             logger.info("No open positions to process for profit taking")
             return results
         
-        logger.info(f"📊 Checking {len(positions)} positions for profit-taking opportunities")
+        logger.info(f"📊 Checking {len(positions)} positions for fee-aware profit-taking")
 
         for position in positions:
             try:
                 results['positions_processed'] += 1
 
-                # All positions (including weather) are now eligible for profit-taking
                 strategy = getattr(position, 'strategy', '') or ''
 
                 # Get current market data
@@ -269,47 +317,61 @@ async def place_profit_taking_orders(
                 
                 # Get current price based on position side
                 if position.side == "YES":
-                    current_price = market_data.get('yes_price', 0) / 100  # Convert cents to dollars
+                    current_price = market_data.get('yes_price', 0) / 100
                 else:
                     current_price = market_data.get('no_price', 0) / 100
                 
-                # Calculate current profit — side-aware
-                if current_price > 0:
-                    if position.side.upper() == 'YES':
-                        profit_pct = (current_price - position.entry_price) / position.entry_price
-                        unrealized_pnl = (current_price - position.entry_price) * position.quantity
+                if current_price <= 0:
+                    continue
+                
+                # Calculate round-trip fees
+                buy_fee = calculate_kalshi_fee(position.quantity, position.entry_price)
+                sell_fee = calculate_kalshi_fee(position.quantity, current_price)
+                total_fees = buy_fee + sell_fee
+                
+                # Calculate actual P&L after fees
+                if position.side.upper() == 'YES':
+                    gross_pnl = (current_price - position.entry_price) * position.quantity
+                else:
+                    gross_pnl = (position.entry_price - current_price) * position.quantity
+                
+                net_pnl = gross_pnl - total_fees
+                
+                # Calculate net profit as percentage of position cost
+                position_cost = position.entry_price * position.quantity
+                net_profit_pct = net_pnl / position_cost if position_cost > 0 else 0
+                
+                logger.debug(
+                    f"Position {position.market_id}: Entry=${position.entry_price:.3f}, "
+                    f"Current=${current_price:.3f}, Gross=${gross_pnl:.3f}, "
+                    f"Fees=${total_fees:.3f}, Net=${net_pnl:.3f} ({net_profit_pct:.1%})"
+                )
+                
+                # SELL if net profit (after fees) exceeds the threshold
+                if net_pnl > 0 and net_profit_pct >= profit_threshold:
+                    # Sell at 1% below current price for quick execution
+                    sell_price = current_price * 0.99
+                    sell_price = max(0.01, min(0.99, round(sell_price, 2)))
+                    
+                    logger.info(
+                        f"💰 PROFITABLE AFTER FEES: {position.market_id} [{strategy}] — "
+                        f"Gross=${gross_pnl:.3f}, Fees=${total_fees:.3f}, "
+                        f"Net=${net_pnl:.3f} ({net_profit_pct:.1%}) → SELLING"
+                    )
+                    
+                    # Place sell limit order
+                    success = await place_sell_limit_order(
+                        position=position,
+                        limit_price=sell_price,
+                        db_manager=db_manager,
+                        kalshi_client=kalshi_client
+                    )
+                    
+                    if success:
+                        results['orders_placed'] += 1
+                        logger.info(f"✅ Fee-aware profit-taking order placed for {position.market_id}")
                     else:
-                        # For NO positions: profit when price drops
-                        profit_pct = (position.entry_price - current_price) / position.entry_price
-                        unrealized_pnl = (position.entry_price - current_price) * position.quantity
-                    
-                    logger.debug(f"Position {position.market_id}: Entry=${position.entry_price:.3f}, Current=${current_price:.3f}, Profit={profit_pct:.1%}, PnL=${unrealized_pnl:.2f}")
-                    
-                    # Use different thresholds for weather vs other strategies
-                    effective_threshold = profit_threshold
-                    if strategy.startswith('weather'):
-                        effective_threshold = 0.50  # 50% profit target for weather (higher bar)
-                    
-                    # Check if we should place a profit-taking sell order
-                    if profit_pct >= effective_threshold:
-                        # Calculate sell limit price (slightly below current to ensure execution)
-                        sell_price = current_price * 0.98  # 2% below current price for quick execution
-                        
-                        logger.info(f"💰 PROFIT TARGET HIT: {position.market_id} [{strategy}] - {profit_pct:.1%} profit (${unrealized_pnl:.2f})")
-                        
-                        # Place sell limit order
-                        success = await place_sell_limit_order(
-                            position=position,
-                            limit_price=sell_price,
-                            db_manager=db_manager,
-                            kalshi_client=kalshi_client
-                        )
-                        
-                        if success:
-                            results['orders_placed'] += 1
-                            logger.info(f"✅ Profit-taking order placed for {position.market_id}")
-                        else:
-                            logger.error(f"❌ Failed to place profit-taking order for {position.market_id}")
+                        logger.error(f"❌ Failed to place profit-taking order for {position.market_id}")
                 
             except Exception as e:
                 logger.error(f"Error processing position {position.market_id} for profit taking: {e}")

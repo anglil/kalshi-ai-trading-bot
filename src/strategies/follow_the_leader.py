@@ -559,17 +559,25 @@ async def _execute_leader_trade(
 
         if order_response and "order" in order_response:
             order_id = order_response["order"].get("order_id", client_order_id)
+            entry_dollars = limit_price / 100.0
+            # Tight take-profit: sell as soon as ~10% profitable past fees
+            if signal.side == "YES":
+                ftl_sl = max(0.02, round(entry_dollars * 0.75, 2))
+                ftl_tp = min(0.95, round(entry_dollars * 1.10, 2))
+            else:
+                ftl_sl = min(0.99, round(entry_dollars * 1.25, 2))
+                ftl_tp = max(0.02, round(entry_dollars * 0.90, 2))
             position = Position(
                 market_id=signal.ticker,
                 side=signal.side,
                 quantity=shares,
-                entry_price=limit_price / 100.0,
+                entry_price=entry_dollars,
                 live=True,
                 timestamp=datetime.now(),
                 rationale=signal.rationale,
                 strategy="follow_the_leader",
-                stop_loss_price=0.01,
-                take_profit_price=0.99,
+                stop_loss_price=ftl_sl,
+                take_profit_price=ftl_tp,
                 max_hold_hours=min(signal.market_span_hours, 72),
             )
             await db_manager.add_position(position)

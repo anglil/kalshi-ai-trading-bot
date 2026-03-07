@@ -29,10 +29,10 @@ class StopLossCalculator:
     MAX_STOP_LOSS_PCT = 0.10    # 10% maximum stop-loss  
     DEFAULT_STOP_LOSS_PCT = 0.07 # 7% default stop-loss
     
-    # Take-profit targets
-    MIN_TAKE_PROFIT_PCT = 0.15   # 15% minimum take-profit
-    MAX_TAKE_PROFIT_PCT = 0.30   # 30% maximum take-profit
-    DEFAULT_TAKE_PROFIT_PCT = 0.20 # 20% default take-profit
+    # Take-profit targets — sell ASAP once profitable past fees
+    MIN_TAKE_PROFIT_PCT = 0.07   # 7% take-profit (low confidence — quick exit)
+    MAX_TAKE_PROFIT_PCT = 0.12   # 12% take-profit (high confidence — slightly more room)
+    DEFAULT_TAKE_PROFIT_PCT = 0.10 # 10% default take-profit
     
     @classmethod
     def calculate_stop_loss_levels(
@@ -78,14 +78,14 @@ class StopLossCalculator:
         volatility_adjustment = min(1.5, 1.0 + (market_volatility - 0.2))
         adjusted_stop_loss_pct = stop_loss_pct * volatility_adjustment
         
-        # Calculate take-profit percentage (inverse of stop-loss logic)
-        # Higher confidence = wider take-profit targets
+        # Calculate take-profit percentage — sell quickly once profitable past fees
+        # All confidence levels use tight take-profits for fast capital recycling
         if confidence >= 0.8:
-            take_profit_pct = cls.MAX_TAKE_PROFIT_PCT  # 30% for high confidence
+            take_profit_pct = cls.MAX_TAKE_PROFIT_PCT  # 12% for high confidence
         elif confidence >= 0.6:
-            take_profit_pct = cls.DEFAULT_TAKE_PROFIT_PCT  # 20% for medium confidence
+            take_profit_pct = cls.DEFAULT_TAKE_PROFIT_PCT  # 10% for medium confidence
         else:
-            take_profit_pct = cls.MIN_TAKE_PROFIT_PCT  # 15% for low confidence
+            take_profit_pct = cls.MIN_TAKE_PROFIT_PCT  # 7% for low confidence
             
         # Calculate actual price levels based on side
         if side.upper() == "YES":

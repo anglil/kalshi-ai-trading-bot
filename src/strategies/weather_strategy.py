@@ -553,15 +553,15 @@ async def execute_weather_trade(
             order_id = order_response["order"].get("order_id", client_order_id)
             
             entry_dollars = signal.limit_price / 100.0
-            # FIX: Side-aware stop-loss and take-profit levels
-            # YES positions: stop below entry (price drop = loss), take-profit above (price rise = gain)
-            # NO positions: stop above entry (NO price rise = loss), take-profit below (NO price drop = gain)
+            # Side-aware stop-loss and take-profit levels
+            # Take-profit is TIGHT: sell as soon as ~10% profitable (fees are ~3-4%)
+            # Stop-loss is moderate: cut losses at ~25% to limit downside
             if signal.side == "YES":
-                sl_price = max(0.02, round(entry_dollars * 0.50, 2))
-                tp_price = min(0.95, round(entry_dollars * 1.80, 2))
+                sl_price = max(0.02, round(entry_dollars * 0.75, 2))   # 25% stop loss
+                tp_price = min(0.95, round(entry_dollars * 1.10, 2))   # 10% take profit
             else:  # NO side
-                sl_price = min(0.99, round(entry_dollars * 1.50, 2))
-                tp_price = max(0.02, round(entry_dollars * 0.20, 2))
+                sl_price = min(0.99, round(entry_dollars * 1.25, 2))   # 25% stop loss
+                tp_price = max(0.02, round(entry_dollars * 0.90, 2))   # 10% take profit
             position = Position(
                 market_id=signal.bracket.ticker,
                 side=signal.side,

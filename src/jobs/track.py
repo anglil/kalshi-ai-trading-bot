@@ -163,7 +163,7 @@ async def run_tracking(db_manager: Optional[DatabaseManager] = None):
         profit_results = await place_profit_taking_orders(
             db_manager=db_manager,
             kalshi_client=kalshi_client,
-            profit_threshold=0.20  # 20% profit target
+            profit_threshold=0.05  # 5% net profit after fees — sell ASAP when profitable
         )
         
         logger.info("🛡️ Checking for stop-loss protection...")

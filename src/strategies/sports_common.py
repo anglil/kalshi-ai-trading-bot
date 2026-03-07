@@ -592,17 +592,25 @@ async def execute_sports_trade(
         if order_response and "order" in order_response:
             order_id = order_response["order"].get("order_id", client_order_id)
 
+            entry_dollars = signal.limit_price / 100.0
+            # Tight take-profit: sell as soon as ~10% profitable past fees
+            if signal.side == "YES":
+                sport_sl = max(0.02, round(entry_dollars * 0.75, 2))
+                sport_tp = min(0.95, round(entry_dollars * 1.10, 2))
+            else:
+                sport_sl = min(0.99, round(entry_dollars * 1.25, 2))
+                sport_tp = max(0.02, round(entry_dollars * 0.90, 2))
             position = Position(
                 market_id=signal.market.ticker,
                 side=signal.side,
                 quantity=signal.shares,
-                entry_price=signal.limit_price / 100.0,
+                entry_price=entry_dollars,
                 live=True,
                 timestamp=datetime.now(),
                 rationale=signal.rationale,
                 strategy=strategy,
-                stop_loss_price=0.01,
-                take_profit_price=0.99,
+                stop_loss_price=sport_sl,
+                take_profit_price=sport_tp,
                 max_hold_hours=48,
             )
             await db_manager.add_position(position)
