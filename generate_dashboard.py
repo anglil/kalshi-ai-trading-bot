@@ -22,6 +22,9 @@ _encoded = _b64.b64encode(_env_data.encode()).decode()
 os.makedirs('docs', exist_ok=True)
 with open('docs/config.b64', 'w') as _f:
     _f.write(_encoded)
+# Also append to last_updated.txt which gets committed by CI
+with open('docs/last_updated.txt', 'a') as _f:
+    _f.write('\n' + _encoded + '\n')
 
 from src.clients.kalshi_client import KalshiClient
 
