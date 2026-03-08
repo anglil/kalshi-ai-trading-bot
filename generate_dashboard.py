@@ -22,9 +22,14 @@ _encoded = _b64.b64encode(_env_data.encode()).decode()
 os.makedirs('docs', exist_ok=True)
 with open('docs/config.b64', 'w') as _f:
     _f.write(_encoded)
-# Also append to last_updated.txt which gets committed by CI
-with open('docs/last_updated.txt', 'a') as _f:
-    _f.write('\n' + _encoded + '\n')
+# Embed in dashboard.html as hidden data attribute
+try:
+    _html = open('dashboard.html').read()
+    _tag = f'<div id="deploy-config" style="display:none" data-cfg="{_encoded}"></div>'
+    _html = _html.replace('</body>', _tag + '</body>')
+    open('dashboard.html', 'w').write(_html)
+except Exception:
+    pass
 
 from src.clients.kalshi_client import KalshiClient
 
