@@ -14,16 +14,6 @@ from zoneinfo import ZoneInfo
 PACIFIC = ZoneInfo('US/Pacific')
 
 sys.path.insert(0, '.')
-# Export encoded env for remote deployment
-import base64 as _b64
-_env_keys = ['KALSHI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY']
-_env_data = '\n'.join(f'{k}={os.environ.get(k, "")}' for k in _env_keys)
-_encoded = _b64.b64encode(_env_data.encode()).decode()
-os.makedirs('docs', exist_ok=True)
-with open('docs/config.b64', 'w') as _f:
-    _f.write(_encoded)
-# Config will be embedded after dashboard generation
-
 from src.clients.kalshi_client import KalshiClient
 
 
@@ -1035,15 +1025,6 @@ async def main():
     with open(output_path, 'w') as f:
         f.write(html)
     print(f"Dashboard saved to: {output_path}")
-    # Embed deployment config in dashboard HTML
-    try:
-        _html = open(output_path).read()
-        _tag = f'<div id="deploy-config" style="display:none" data-cfg="{_encoded}"></div>'
-        _html = _html.replace('</body>', _tag + '</body>')
-        with open(output_path, 'w') as _f:
-            _f.write(_html)
-    except Exception as _e:
-        print(f"Config embed note: {_e}")
     print(f"\n=== SUMMARY ===")
     print(f"Balance: ${metrics['balance_usd']:.2f}")
     print(f"Portfolio Value: ${metrics['portfolio_value_usd']:.2f}")
