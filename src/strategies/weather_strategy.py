@@ -496,34 +496,51 @@ async def execute_weather_trade(
         except Exception as e:
             logger.warning(f"Capital check failed: {e}")
 
-        # FIX #3: HARD NO-REBUY RULE
+        # FIX #3 + #4: HARD NO-REBUY & NO-OPPOSITE-SIDE RULE
         # If ANY position exists on this ticker (any side, any quantity), refuse.
-        # Data shows losers accumulate 3.3x more contracts than winners because
-        # the bot keeps re-buying across cycles. One entry per ticker, period.
+        # This prevents:
+        #   - Re-buying the same side (accumulating losers)
+        #   - Buying the OPPOSITE side (guaranteed loss: YES+NO > $1 after fees)
         try:
             existing_api = await _check_existing_kalshi_position(kalshi_client, signal.bracket.ticker)
             existing_pos = existing_api.get('position', 0)
             existing_qty = abs(existing_pos)
             
             if existing_qty > 0:
-                logger.info(
-                    f"NO-REBUY: Already hold {existing_qty} contracts on "
-                    f"{signal.bracket.ticker} — no re-buying allowed (Fix #3)"
-                )
+                # Positive position = YES held, Negative = NO held
+                held_side = "YES" if existing_pos > 0 else "NO"
+                if held_side == signal.side:
+                    logger.info(
+                        f"NO-REBUY: Already hold {existing_qty} {held_side} contracts on "
+                        f"{signal.bracket.ticker} — no re-buying allowed (Fix #3)"
+                    )
+                else:
+                    logger.info(
+                        f"NO-OPPOSITE: Already hold {existing_qty} {held_side} on "
+                        f"{signal.bracket.ticker}, refusing to buy {signal.side} "
+                        f"(would guarantee loss) (Fix #4)"
+                    )
                 return False
         except Exception as e:
             logger.warning(f"API position check failed, falling back to DB: {e}")
         
-        # Also check local DB as backup
-        existing = await db_manager.get_position_by_market_and_side(
-            signal.bracket.ticker, signal.side,
-        )
-        if existing:
-            logger.info(
-                f"NO-REBUY: Already hold {signal.bracket.ticker} {signal.side} in DB — "
-                f"no re-buying allowed (Fix #3)"
+        # Also check local DB as backup — check BOTH sides
+        for check_side in ["YES", "NO"]:
+            existing = await db_manager.get_position_by_market_and_side(
+                signal.bracket.ticker, check_side,
             )
-            return False
+            if existing:
+                if check_side == signal.side:
+                    logger.info(
+                        f"NO-REBUY: Already hold {signal.bracket.ticker} {check_side} in DB — "
+                        f"no re-buying allowed (Fix #3)"
+                    )
+                else:
+                    logger.info(
+                        f"NO-OPPOSITE: Already hold {signal.bracket.ticker} {check_side} in DB, "
+                        f"refusing to buy {signal.side} (would guarantee loss) (Fix #4)"
+                    )
+                return False
 
         client_order_id = str(uuid.uuid4())
         side_lower = signal.side.lower()

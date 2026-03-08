@@ -45,6 +45,8 @@ MIN_EDGE_THRESHOLD = 0.08        # Low edge OK for cheap contracts (capped downs
 KELLY_FRACTION = 0.40            # CHEAP SHOTS v5: aggressive Kelly on cheap bets
 MAX_POSITION_PCT = 0.06          # CHEAP SHOTS v5: 6% per bracket (each trade is small $)
 MAX_SHARES_PER_TRADE = 10        # CHEAP SHOTS v5: 10 shares max (10 x 25c = $2.50 max)
+MAX_ENTRY_PRICE_CENTS = 25       # CHEAP SHOTS v5: Only buy contracts at 3-25c
+MIN_ENTRY_PRICE_CENTS = 3        # CHEAP SHOTS v5: Floor to avoid near-zero contracts
 WEATHER_TRADING_PAUSED = False   # Active
 
 
@@ -529,6 +531,21 @@ async def run_consensus_weather_cycle(
 
     # Execute — update city_position_counts within cycle to enforce limits
     for signal in all_signals[:max_trades]:
+        # CHEAP SHOTS v5: Enforce price filter before execution
+        entry_price_cents = signal.limit_price
+        if entry_price_cents is not None and entry_price_cents > MAX_ENTRY_PRICE_CENTS:
+            logger.info(
+                f"PRICE CAP: Skipping {signal.bracket.ticker} {signal.side} @ "
+                f"{entry_price_cents}c — exceeds {MAX_ENTRY_PRICE_CENTS}c max (Cheap Shots v5)"
+            )
+            continue
+        if entry_price_cents is not None and entry_price_cents < MIN_ENTRY_PRICE_CENTS:
+            logger.info(
+                f"PRICE FLOOR: Skipping {signal.bracket.ticker} {signal.side} @ "
+                f"{entry_price_cents}c — below {MIN_ENTRY_PRICE_CENTS}c floor (Cheap Shots v5)"
+            )
+            continue
+
         city = _extract_city_from_ticker(signal.bracket.ticker)
         if city_position_counts[city] >= MAX_POSITIONS_PER_CITY:
             logger.info(
