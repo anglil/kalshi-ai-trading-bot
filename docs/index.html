@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2 text-xs text-slate-400">
     <span class="live-dot"></span>
     <span class="text-green-400 font-semibold">LIVE TRADING</span>
-    <span class="ml-2">Updated: 2026-02-28 19:44:49 UTC</span>
+    <span class="ml-2">Updated: 2026-03-08 08:47:28 PM PT</span>
   </div>
 </div>
 
@@ -48,22 +48,22 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Available Cash</div>
-    <div class="text-2xl font-bold text-white">$88.74</div>
+    <div class="text-2xl font-bold text-white">$17.02</div>
     <div class="text-xs text-slate-500 mt-1">Uninvested balance</div>
   </div>
   <div class="metric-card p-4">
-    <div class="text-xs text-slate-400 mb-1">Portfolio Value</div>
-    <div class="text-2xl font-bold text-blue-400">$203.34</div>
-    <div class="text-xs text-slate-500 mt-1">Open position value</div>
+    <div class="text-xs text-slate-400 mb-1">Positions Value</div>
+    <div class="text-2xl font-bold text-blue-400">$35.18</div>
+    <div class="text-xs text-slate-500 mt-1">Market value of open positions</div>
   </div>
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Total Account</div>
-    <div class="text-2xl font-bold text-white">$292.08</div>
+    <div class="text-2xl font-bold text-white">$52.20</div>
     <div class="text-xs text-slate-500 mt-1">Cash + positions</div>
   </div>
   <div class="metric-card p-4">
     <div class="text-xs text-slate-400 mb-1">Realized P&L</div>
-    <div class="text-2xl font-bold text-red-400">$-9.50</div>
+    <div class="text-2xl font-bold text-red-400">$-12.54</div>
     <div class="text-xs text-slate-500 mt-1">All closed trades</div>
   </div>
 </div>
@@ -72,23 +72,23 @@
 <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Open Positions</div>
-    <div class="text-xl font-bold text-white">13</div>
+     <div class="text-xl font-bold text-white">27</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Total Trades</div>
-    <div class="text-xl font-bold text-white">694</div>
+    <div class="text-xl font-bold text-white">851</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Win Rate</div>
-    <div class="text-xl font-bold text-red-400">5%</div>
+    <div class="text-xl font-bold text-red-400">4%</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Total Exposure</div>
-    <div class="text-xl font-bold text-blue-400">$160.53</div>
+    <div class="text-xl font-bold text-blue-400">$51.33</div>
   </div>
   <div class="card p-3 text-center">
     <div class="text-xs text-slate-400">Fees Paid</div>
-    <div class="text-xl font-bold text-yellow-400">$4.90</div>
+    <div class="text-xl font-bold text-yellow-400">$4.53</div>
   </div>
 </div>
 
@@ -101,7 +101,7 @@
       <span><span style="display:inline-block;width:18px;height:2px;background:#94a3b8;border-top:2px dashed #94a3b8;vertical-align:middle;"></span> Deposited ($400)</span>
     </div>
   </div>
-  <div class="text-xs text-slate-500 mb-3">Reconstructed from 459 fill events · Feb 22 05:23 → now</div>
+  <div class="text-xs text-slate-500 mb-3">Cash + Position Value · Feb 21 09:23pm → now · 500 data points</div>
   <canvas id="portfolioChart" style="max-height:320px;"></canvas>
 </div>
 
@@ -120,8 +120,8 @@
     <canvas id="winLossChart"></canvas>
     <div class="flex justify-center gap-4 mt-2 text-xs">
       <span class="text-green-400">✓ 1 Profitable</span>
-      <span class="text-red-400">✗ 6 Loss</span>
-      <span class="text-slate-400">◎ 15 Open/Neutral</span>
+      <span class="text-red-400">✗ 14 Loss</span>
+      <span class="text-slate-400">◎ 10 Open/Neutral</span>
     </div>
   </div>
 
@@ -144,7 +144,7 @@
 
   <!-- Hourly Activity -->
   <div class="card p-4">
-    <div class="text-sm font-semibold text-white mb-3">🕐 Hourly Trading Activity (UTC)</div>
+    <div class="text-sm font-semibold text-white mb-3">🕐 Hourly Trading Activity (Pacific)</div>
     <canvas id="hourlyChart"></canvas>
   </div>
 
@@ -153,7 +153,7 @@
 <!-- Open Positions Table -->
 <div class="card p-4 mb-4">
   <div class="flex items-center justify-between mb-3">
-    <div class="text-sm font-semibold text-white">📋 Open Positions (13)</div>
+    <div class="text-sm font-semibold text-white">📋 Open Positions (27)</div>
     <span class="badge badge-blue">Live</span>
   </div>
   <div class="scrollable">
@@ -172,99 +172,123 @@
       <tbody>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb28" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB28</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-right text-white">$70.5800</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$70.5800</td>
-          <td class="py-2 pr-3 text-right text-slate-300">135</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$1.1900</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxkhameneiout/khamenei-out/kxkhameneiout-akha" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXKHAMENEIOUT-AKHA</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
-          <td class="py-2 pr-3 text-right text-white">$34.2200</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$34.2200</td>
-          <td class="py-2 pr-3 text-right text-slate-300">39</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.2800</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxhighaus/highest-temperature-in-austin/kxhighaus-26feb28" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHAUS-26FEB28</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-right text-white">$23.2000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$23.2000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">30</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.3900</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxmvecrosscategory/mvecrosscategory/kxmvecrosscategory-s2026445439b0729" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXMVECROSSCATEGORY-S2026445439B0729</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
-          <td class="py-2 pr-3 text-right text-white">$9.1200</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$9.1200</td>
-          <td class="py-2 pr-3 text-right text-slate-300">24</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.4000</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
             <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26apr" target="_blank" rel="noopener"
                class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26APR</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-right text-white">$4.3000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$4.3000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">40</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.2800</td>
+          <td class="py-2 pr-3 text-right text-white">$6.4500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$11.5000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">55</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-0.05</td>
+          <td class="py-2 text-right text-yellow-400">$0.4700</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26feb28" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26FEB28</a>
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-26jun" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-26JUN</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$6.0000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$17.1000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">30</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-1.10</td>
+          <td class="py-2 text-right text-yellow-400">$0.5400</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26mar08" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26MAR08</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-right text-white">$4.2500</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$4.2500</td>
-          <td class="py-2 pr-3 text-right text-slate-300">65</td>
+          <td class="py-2 pr-3 text-right text-white">$4.6800</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$4.6800</td>
+          <td class="py-2 pr-3 text-right text-slate-300">16</td>
           <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.1200</td>
+          <td class="py-2 text-right text-yellow-400">$0.0000</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28lalgsw" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28LALGSW</a>
+            <a href="https://kalshi.com/markets/kxgdp/gdp/kxgdp-26apr30" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXGDP-26APR30</a>
           </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-right text-white">$4.1000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$12.8000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">30</td>
-          <td class="py-2 pr-3 text-right text-green-400">$+1.30</td>
-          <td class="py-2 text-right text-yellow-400">$0.3900</td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$4.2000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$4.2000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">10</td>
+          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
+          <td class="py-2 text-right text-yellow-400">$0.0500</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28torwas" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28TORWAS</a>
+            <a href="https://kalshi.com/markets/kxmvecrosscategory/mvecrosscategory/kxmvecrosscategory-s2026ca03220eeb0" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXMVECROSSCATEGORY-S2026CA03220EEB0</a>
           </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-right text-white">$2.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$2.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">20</td>
+          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
+          <td class="py-2 pr-3 text-right text-white">$3.6400</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$3.6400</td>
+          <td class="py-2 pr-3 text-right text-slate-300">7</td>
           <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.1600</td>
+          <td class="py-2 text-right text-yellow-400">$0.0000</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-27oct" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-27OCT</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$3.2500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$8.6000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">15</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-0.35</td>
+          <td class="py-2 text-right text-yellow-400">$0.2500</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-28jan" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-28JAN</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$3.2500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$8.6500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">15</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-0.40</td>
+          <td class="py-2 text-right text-yellow-400">$0.2500</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-27dec" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-27DEC</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$3.2000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$8.7000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">15</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-0.50</td>
+          <td class="py-2 text-right text-yellow-400">$0.2600</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26mar" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAR</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$3.2000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$46.2000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">90</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-3.00</td>
+          <td class="py-2 text-right text-yellow-400">$0.3700</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-26jul" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-26JUL</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$2.9000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$13.7000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">25</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-0.80</td>
+          <td class="py-2 text-right text-yellow-400">$0.4500</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
@@ -292,27 +316,15 @@
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxhighny/highest-temperature-in-new-york/kxhighny-26feb28" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHNY-26FEB28</a>
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26jun" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26JUN</a>
           </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-right text-white">$1.7000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$1.7000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">10</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.0000</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 font-mono">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26mar01saclal" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26MAR01SACLAL</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-right text-white">$1.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$1.6000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">10</td>
-          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
-          <td class="py-2 text-right text-yellow-400">$0.1000</td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$1.7500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$34.7500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">70</td>
+          <td class="py-2 pr-3 text-right text-red-400">$-3.00</td>
+          <td class="py-2 text-right text-yellow-400">$0.3700</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
           <td class="py-2 pr-3 font-mono">
@@ -320,11 +332,59 @@
                class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-right text-white">$1.1000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$78.4000</td>
-          <td class="py-2 pr-3 text-right text-slate-300">175</td>
+          <td class="py-2 pr-3 text-right text-white">$1.3000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$78.6000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">180</td>
           <td class="py-2 pr-3 text-right text-red-400">$-2.30</td>
-          <td class="py-2 text-right text-yellow-400">$0.6100</td>
+          <td class="py-2 text-right text-yellow-400">$0.6200</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxwti/wti/kxwti-26mar09" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXWTI-26MAR09</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
+          <td class="py-2 pr-3 text-right text-white">$1.1500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$1.1500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">10</td>
+          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
+          <td class="py-2 text-right text-yellow-400">$0.0000</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-right text-white">$1.0000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$5.5500</td>
+          <td class="py-2 pr-3 text-right text-slate-300">24</td>
+          <td class="py-2 pr-3 text-right text-green-400">$+2.45</td>
+          <td class="py-2 text-right text-yellow-400">$0.0100</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxhighny/highest-temperature-in-new-york/kxhighny-26mar08" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHNY-26MAR08</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-right text-white">$0.9000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$0.9000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">10</td>
+          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
+          <td class="py-2 text-right text-yellow-400">$0.0000</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 font-mono">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26oct" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26OCT</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-right text-white">$0.7000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$0.7000</td>
+          <td class="py-2 pr-3 text-right text-slate-300">5</td>
+          <td class="py-2 pr-3 text-right text-slate-400">$+0.00</td>
+          <td class="py-2 text-right text-yellow-400">$0.0200</td>
         </tr>
       </tbody>
     </table>
@@ -341,7 +401,7 @@
     <table class="w-full text-xs">
       <thead>
         <tr class="text-slate-400 border-b border-slate-700">
-          <th class="text-left py-2 pr-3">Time (UTC)</th>
+          <th class="text-left py-2 pr-3">Time (PT)</th>
           <th class="text-left py-2 pr-3">Market</th>
           <th class="text-left py-2 pr-3">Strategy</th>
           <th class="text-center py-2 pr-3">Action</th>
@@ -353,263 +413,263 @@
       </thead>
       <tbody>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">03/01 00:41</td>
+          <td class="py-2 pr-3 text-slate-400">03/08 08:37pm</td>
           <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxmvecrosscategory/mvecrosscategory/kxmvecrosscategory-s2026445439b0729-fa6c49a59a6" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXMVECROSSCATEGORY-S2026445439</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">24</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$38¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.40</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 23:40</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28torwas-was" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28TORWAS-WAS</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$13¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.08</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 23:40</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28torwas-was" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28TORWAS-WAS</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$13¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.08</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 23:40</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28lalgsw-lal" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28LALGSW-LAL</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$59¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.17</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 23:40</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26feb28lalgsw-gsw" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26FEB28LALGSW-GSW</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$41¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.17</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 23:40</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxnbagame/nba-game-winner/kxnbagame-26mar01saclal-lal" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXNBAGAME-26MAR01SACLAL-LAL</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-blue">NBA</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$84¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.10</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26may-t-0.1" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAY-T-0.1</a>
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26jun-t0.5" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26JUN-T0.5</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">5</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$16¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.02</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/08 08:35pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08-b82.5" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08-B82.5</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
           <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$99¢</td>
+          <td class="py-2 pr-3 text-right text-white">7</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$1¢</td>
           <td class="py-2 text-right text-yellow-400">$0.01</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26mar-t-0.1" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26MAR-T-0.1</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">30</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$98¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.05</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
+          <td class="py-2 pr-3 text-slate-400">03/08 08:35pm</td>
           <td class="py-2 pr-3 font-mono text-xs">
             <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26jun-t-0.1" target="_blank" rel="noopener"
                class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26JUN-T-0.1</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
           <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">30</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$98¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.05</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t0.1" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T0.1</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">30</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$94¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.12</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 20:28</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t0.0" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T0.0</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">25</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$98¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.04</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 19:48</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighny/highest-temperature-in-new-york/kxhighny-26feb28-b52.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHNY-26FEB28-B52.5</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">NO</td>
           <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$83¢</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$81¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.06</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/08 05:35am</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t0.4" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T0.4</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">2</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$4¢</td>
           <td class="py-2 text-right text-yellow-400">$0.00</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 19:48</td>
+          <td class="py-2 pr-3 text-slate-400">03/07 11:46pm</td>
           <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighny/highest-temperature-in-new-york/kxhighny-26feb28-b52.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHNY-26FEB28-B52.5</a>
+            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26mar08-t66" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26MAR08-T66</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
           <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$83¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.00</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 19:45</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t-0.1" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T-0.1</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$95¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.01</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 19:45</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t-0.1" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T-0.1</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$95¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.01</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 09:13</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t-0.1" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T-0.1</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-red-400 font-bold">SELL</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">YES</td>
           <td class="py-2 pr-3 text-right text-white">10</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$99¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.01</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$3¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 06:10</td>
+          <td class="py-2 pr-3 text-slate-400">03/07 11:31pm</td>
           <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26feb28-t48" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26FEB28-T48</a>
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08-t85" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08-T85</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
           <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$5¢</td>
+          <td class="py-2 pr-3 text-right text-white">2</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$10¢</td>
           <td class="py-2 text-right text-yellow-400">$0.00</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 06:10</td>
+          <td class="py-2 pr-3 text-slate-400">03/07 11:26pm</td>
           <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26feb28-t48" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26FEB28-T48</a>
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08-t85" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08-T85</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
           <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$5¢</td>
+          <td class="py-2 pr-3 text-right text-white">2</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$10¢</td>
           <td class="py-2 text-right text-yellow-400">$0.00</td>
         </tr>
         <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/28 06:10</td>
+          <td class="py-2 pr-3 text-slate-400">03/07 11:01pm</td>
           <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26feb28-t48" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26FEB28-T48</a>
-          </td>
-          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
-          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
-          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
-          <td class="py-2 pr-3 text-right text-white">5</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$5¢</td>
-          <td class="py-2 text-right text-yellow-400">$0.00</td>
-        </tr>
-        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
-          <td class="py-2 pr-3 text-slate-400">02/27 21:51</td>
-          <td class="py-2 pr-3 font-mono text-xs">
-            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26feb28-b80.5" target="_blank" rel="noopener"
-               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26FEB28-B80.5</a>
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08-t85" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08-T85</a>
           </td>
           <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
           <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
           <td class="py-2 pr-3 text-center text-slate-300">YES</td>
           <td class="py-2 pr-3 text-right text-white">4</td>
-          <td class="py-2 pr-3 text-right text-slate-300">$5¢</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$10¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 09:57pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxwti/wti/kxwti-26mar09-t67.99" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXWTI-26MAR09-T67.99</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
+          <td class="py-2 pr-3 text-right text-white">5</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$91¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 09:46pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08-t85" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08-T85</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">2</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$10¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 07:04pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26feb-t0.4" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26FEB-T0.4</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">3</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$4¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.01</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 05:09pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-27oct-h0" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-27OCT-H0</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">5</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$65¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.08</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 02:36pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26mar08-b63.5" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26MAR08-B63.5</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
+          <td class="py-2 pr-3 text-right text-white">3</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$27¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 02:34pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxhighchi/highest-temperature-in-chicago/kxhighchi-26mar08-b63.5" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHCHI-26MAR08-B63.5</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
+          <td class="py-2 pr-3 text-right text-white">3</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$27¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 01:48pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxhighny/highest-temperature-in-new-york/kxhighny-26mar08-t62" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHNY-26MAR08-T62</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">10</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$9¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 01:22pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26oct-t0.5" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26OCT-T0.5</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">5</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$14¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.02</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 01:20pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxcpi/cpi-month-over-month/kxcpi-26apr-t0.4" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXCPI-26APR-T0.4</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">1</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$43¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.01</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 01:17pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxwti/wti/kxwti-26mar09-t68.99" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXWTI-26MAR09-T68.99</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-gray">Other</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
+          <td class="py-2 pr-3 text-right text-white">5</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$86¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.00</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 01:17pm</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxfeddecision/feddecision/kxfeddecision-27dec-h0" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXFEDDECISION-27DEC-H0</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-yellow">Economics</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">YES</td>
+          <td class="py-2 pr-3 text-right text-white">5</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$64¢</td>
+          <td class="py-2 text-right text-yellow-400">$0.09</td>
+        </tr>
+        <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+          <td class="py-2 pr-3 text-slate-400">03/07 11:42am</td>
+          <td class="py-2 pr-3 font-mono text-xs">
+            <a href="https://kalshi.com/markets/kxhighmia/highest-temperature-in-miami/kxhighmia-26mar08-b82.5" target="_blank" rel="noopener"
+               class="text-blue-400 hover:text-blue-300 hover:underline" title="Open on Kalshi">KXHIGHMIA-26MAR08-B82.5</a>
+          </td>
+          <td class="py-2 pr-3"><span class="badge badge-green">Weather</span></td>
+          <td class="py-2 pr-3 text-center"><span class="text-green-400 font-bold">BUY</span></td>
+          <td class="py-2 pr-3 text-center text-slate-300">NO</td>
+          <td class="py-2 pr-3 text-right text-white">7</td>
+          <td class="py-2 pr-3 text-right text-slate-300">$36¢</td>
           <td class="py-2 text-right text-yellow-400">$0.00</td>
         </tr>
       </tbody>
@@ -637,7 +697,7 @@
 </div>
 
 <div class="text-center text-xs text-slate-600 pb-4">
-  Kalshi AI Trading Bot Dashboard · Generated 2026-02-28 19:44:49 UTC · Data from Kalshi REST API
+  Kalshi AI Trading Bot Dashboard · Generated 2026-03-08 08:47:28 PM PT · Data from Kalshi REST API
 </div>
 
 <script>
@@ -654,11 +714,11 @@ const chartDefaults = {
 new Chart(document.getElementById('pnlChart'), {
   type: 'bar',
   data: {
-    labels: ["Other", "NBA", "Economics", "Weather", "Politics"],
+    labels: ["Economics", "Weather", "Other", "Politics"],
     datasets: [{
       label: 'Realized P&L ($)',
-      data: [0.0, 1.3, -10.8, 0.0, 0.0],
-      backgroundColor: ["#22c55e", "#22c55e", "#ef4444", "#22c55e", "#22c55e"],
+      data: [-14.99, 2.45, 0.0, 0.0],
+      backgroundColor: ["#ef4444", "#22c55e", "#22c55e", "#22c55e"],
       borderRadius: 6,
     }]
   },
@@ -678,7 +738,7 @@ new Chart(document.getElementById('winLossChart'), {
   data: {
     labels: ["Profitable", "Loss", "Neutral/Open"],
     datasets: [{
-      data: [1, 6, 15],
+      data: [1, 14, 10],
       backgroundColor: ["#22c55e", "#ef4444", "#94a3b8"],
       borderWidth: 0,
       hoverOffset: 6
@@ -697,10 +757,10 @@ const expColors = ['#3b82f6','#22c55e','#f59e0b','#a855f7','#ef4444','#06b6d4','
 new Chart(document.getElementById('exposureChart'), {
   type: 'doughnut',
   data: {
-    labels: ["Other", "NBA", "Economics", "Weather", "Politics"],
+    labels: ["Economics", "Weather", "Other", "Politics"],
     datasets: [{
-      data: [45.14, 8.3, 5.4, 99.73, 1.96],
-      backgroundColor: expColors.slice(0, 5),
+      data: [36.2, 6.58, 6.59, 1.96],
+      backgroundColor: expColors.slice(0, 4),
       borderWidth: 0,
       hoverOffset: 6
     }]
@@ -717,10 +777,10 @@ new Chart(document.getElementById('exposureChart'), {
 new Chart(document.getElementById('volumeChart'), {
   type: 'bar',
   data: {
-    labels: ["Other", "NBA", "Economics", "Weather", "Politics"],
+    labels: ["Economics", "Weather", "Other", "NBA", "Politics"],
     datasets: [
-      { label: 'Buys', data: [17, 11, 26, 606, 1], backgroundColor: '#22c55e', borderRadius: 4 },
-      { label: 'Sells', data: [0, 0, 10, 23, 0], backgroundColor: '#ef4444', borderRadius: 4 }
+      { label: 'Buys', data: [54, 643, 70, 27, 1], backgroundColor: '#22c55e', borderRadius: 4 },
+      { label: 'Sells', data: [25, 31, 0, 0, 0], backgroundColor: '#ef4444', borderRadius: 4 }
     ]
   },
   options: {
@@ -740,7 +800,7 @@ new Chart(document.getElementById('hourlyChart'), {
     labels: ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"],
     datasets: [{
       label: 'Trades',
-      data: [10, 19, 2, 12, 11, 12, 8, 3, 6, 13, 7, 5, 0, 63, 27, 58, 36, 75, 72, 68, 88, 38, 46, 15],
+      data: [6, 13, 17, 6, 20, 64, 27, 68, 43, 96, 79, 74, 88, 46, 50, 17, 19, 29, 21, 14, 16, 16, 14, 8],
       backgroundColor: '#3b82f6',
       borderRadius: 3,
     }]
@@ -756,8 +816,8 @@ new Chart(document.getElementById('hourlyChart'), {
 });
 
 // 6. Portfolio Value Over Time — two lines only: total portfolio and deposit baseline
-const portfolioLabels = ["Feb 22 05:23", "Feb 22 06:23", "Feb 22 07:05", "Feb 22 09:40", "Feb 22 17:18", "Feb 22 17:18", "Feb 22 17:20", "Feb 22 17:21", "Feb 22 17:40", "Feb 22 17:40", "Feb 22 17:41", "Feb 22 17:50", "Feb 22 18:11", "Feb 22 18:22", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 18:41", "Feb 22 19:11", "Feb 22 19:11", "Feb 22 19:12", "Feb 22 19:15", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 19:41", "Feb 22 20:12", "Feb 22 20:12", "Feb 22 20:12", "Feb 22 20:42", "Feb 22 20:42", "Feb 22 20:42", "Feb 22 21:12", "Feb 22 21:12", "Feb 22 21:12", "Feb 22 21:42", "Feb 22 21:42", "Feb 22 21:42", "Feb 22 22:12", "Feb 22 22:12", "Feb 22 23:39", "Feb 22 23:59", "Feb 22 23:59", "Feb 22 23:59", "Feb 22 23:59", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:29", "Feb 23 00:59", "Feb 23 00:59", "Feb 23 01:06", "Feb 23 01:29", "Feb 23 01:29", "Feb 23 01:42", "Feb 23 01:59", "Feb 23 01:59", "Feb 23 02:30", "Feb 23 02:30", "Feb 23 03:00", "Feb 23 03:00", "Feb 23 03:46", "Feb 23 03:46", "Feb 23 04:16", "Feb 23 04:46", "Feb 23 04:47", "Feb 23 04:51", "Feb 23 04:51", "Feb 23 05:23", "Feb 23 05:47", "Feb 23 05:52", "Feb 23 06:17", "Feb 23 06:17", "Feb 23 06:47", "Feb 23 07:07", "Feb 23 07:18", "Feb 23 07:48", "Feb 23 08:01", "Feb 23 08:02", "Feb 23 08:16", "Feb 23 08:16", "Feb 23 08:46", "Feb 23 08:46", "Feb 23 09:16", "Feb 23 09:16", "Feb 23 09:35", "Feb 23 09:47", "Feb 23 09:47", "Feb 23 10:13", "Feb 23 10:17", "Feb 23 10:17", "Feb 23 10:24", "Feb 23 10:47", "Feb 23 10:47", "Feb 23 11:17", "Feb 23 11:17", "Feb 23 11:48", "Feb 23 11:56", "Feb 23 11:58", "Feb 23 13:01", "Feb 23 13:18", "Feb 23 13:18", "Feb 23 13:49", "Feb 23 13:49", "Feb 23 22:38", "Feb 23 22:38", "Feb 24 13:01", "Feb 24 13:01", "Feb 24 13:22", "Feb 24 13:33", "Feb 24 13:33", "Feb 24 14:03", "Feb 24 14:08", "Feb 24 14:34", "Feb 24 14:34", "Feb 24 15:04", "Feb 24 15:05", "Feb 24 15:34", "Feb 24 15:34", "Feb 24 15:34", "Feb 24 16:05", "Feb 24 16:05", "Feb 24 17:06", "Feb 24 17:06", "Feb 24 17:17", "Feb 24 17:17", "Feb 24 17:48", "Feb 24 17:48", "Feb 24 18:18", "Feb 24 18:18", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:22", "Feb 24 18:23", "Feb 24 18:52", "Feb 24 18:52", "Feb 24 18:52", "Feb 24 18:53", "Feb 24 18:53", "Feb 24 19:01", "Feb 24 19:06", "Feb 24 19:09", "Feb 24 19:22", "Feb 24 19:22", "Feb 24 19:22", "Feb 24 19:23", "Feb 24 19:23", "Feb 24 19:25", "Feb 24 19:27", "Feb 24 19:28", "Feb 24 19:28", "Feb 24 19:52", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:53", "Feb 24 19:54", "Feb 24 19:54", "Feb 24 20:02", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:23", "Feb 24 20:53", "Feb 24 20:53", "Feb 24 20:53", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:41", "Feb 24 21:42", "Feb 24 21:45", "Feb 24 22:13", "Feb 24 22:13", "Feb 24 22:13", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:43", "Feb 24 22:45", "Feb 25 13:01", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:18", "Feb 25 13:19", "Feb 25 13:20", "Feb 25 13:22", "Feb 25 13:23", "Feb 25 13:23", "Feb 25 13:24", "Feb 25 13:24", "Feb 25 13:25", "Feb 25 13:27", "Feb 25 13:28", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:48", "Feb 25 13:49", "Feb 25 13:53", "Feb 25 13:57", "Feb 25 13:58", "Feb 25 14:01", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:18", "Feb 25 14:48", "Feb 25 14:48", "Feb 25 14:48", "Feb 25 15:19", "Feb 25 15:19", "Feb 25 15:19", "Feb 25 15:49", "Feb 25 15:49", "Feb 25 15:49", "Feb 25 16:19", "Feb 25 16:19", "Feb 25 16:20", "Feb 25 16:20", "Feb 25 16:30", "Feb 25 16:42", "Feb 25 16:42", "Feb 25 16:42", "Feb 25 16:56", "Feb 25 16:56", "Feb 25 17:53", "Feb 25 17:53", "Feb 25 17:53", "Feb 25 17:57", "Feb 25 18:23", "Feb 25 18:23", "Feb 25 18:24", "Feb 25 18:28", "Feb 25 18:39", "Feb 25 18:53", "Feb 25 18:54", "Feb 25 18:57", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:24", "Feb 25 19:26", "Feb 25 19:54", "Feb 25 19:54", "Feb 25 19:55", "Feb 25 19:57", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:23", "Feb 25 20:37", "Feb 25 20:53", "Feb 25 20:53", "Feb 25 20:53", "Feb 25 20:54", "Feb 25 20:54", "Feb 25 21:41", "Feb 25 21:41", "Feb 25 21:41", "Feb 25 22:11", "Feb 25 22:11", "Feb 25 22:11", "Feb 25 22:14", "Feb 26 13:01", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:26", "Feb 26 13:28", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 13:56", "Feb 26 14:26", "Feb 26 15:27", "Feb 26 15:27", "Feb 26 15:27", "Feb 26 15:57", "Feb 26 16:06", "Feb 26 16:06", "Feb 26 16:30", "Feb 26 16:30", "Feb 26 16:37", "Feb 26 16:58", "Feb 26 16:58", "Feb 26 17:05", "Feb 26 17:05", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:06", "Feb 26 17:53", "Feb 26 17:54", "Feb 26 18:24", "Feb 26 18:24", "Feb 26 18:54", "Feb 26 18:55", "Feb 26 19:24", "Feb 26 19:54", "Feb 26 19:55", "Feb 26 19:56", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:25", "Feb 26 20:26", "Feb 26 20:27", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:28", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:29", "Feb 26 20:30", "Feb 26 20:30", "Feb 26 20:39", "Feb 26 21:18", "Feb 26 21:18", "Feb 26 21:18", "Feb 26 21:48", "Feb 26 21:48", "Feb 26 21:48", "Feb 26 22:06", "Feb 26 22:13", "Feb 26 22:18", "Feb 26 22:18", "Feb 26 22:18", "Feb 26 22:19", "Feb 26 22:19", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 22:49", "Feb 26 23:19", "Feb 26 23:38", "Feb 26 23:49", "Feb 26 23:49", "Feb 27 00:20", "Feb 27 00:20", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:05", "Feb 27 01:06", "Feb 27 01:06", "Feb 27 01:06", "Feb 27 01:36", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:24", "Feb 27 03:26", "Feb 27 03:26", "Feb 27 04:11", "Feb 27 04:43", "Feb 27 05:59", "Feb 27 06:06", "Feb 27 13:01", "Feb 27 15:08", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:09", "Feb 27 15:35", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:39", "Feb 27 15:47", "Feb 27 15:49", "Feb 27 16:03", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:15", "Feb 27 17:16", "Feb 27 17:18", "Feb 27 17:44", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:45", "Feb 27 17:48", "Feb 27 17:50", "Feb 27 18:09", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:15", "Feb 27 18:16", "Feb 27 18:16", "Feb 27 18:16", "Feb 27 18:18", "Feb 27 18:21", "Feb 27 18:21", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:44", "Feb 27 19:46", "Feb 27 19:47", "Feb 27 19:47", "Feb 27 19:51", "Feb 27 20:00", "Feb 27 20:00", "Feb 27 20:03", "Feb 27 20:03", "Feb 27 20:04", "Feb 27 20:05", "Feb 27 20:09", "Feb 27 20:13", "Feb 27 20:23", "Feb 27 21:51", "Feb 27 22:16", "Feb 28 03:55", "Feb 28 04:40", "Feb 28 04:42", "Feb 28 04:50", "Feb 28 06:01", "Feb 28 06:10", "Feb 28 09:13", "Feb 28 13:02", "Feb 28 13:02", "Feb 28 19:45", "Feb 28 19:48", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:28", "Feb 28 20:47", "Feb 28 23:40", "Feb 28 23:40", "Feb 28 23:40", "Feb 28 23:40", "Mar 01 00:41", "Mar 01 00:44"];
-const portfolioTotal = [400.0, 392.39, 387.12, 368.14, 311.94, 311.73, 311.56, 311.43, 309.01, 308.99, 308.86, 307.76, 305.23, 318.7, 316.28, 316.25, 316.22, 316.19, 316.18, 312.46, 312.42, 312.29, 311.87, 308.63, 308.59, 308.57, 308.54, 304.72, 304.7, 304.67, 300.82, 300.81, 300.78, 297.07, 296.93, 296.91, 293.1, 293.08, 293.06, 289.25, 289.21, 314.59, 312.08, 312.04, 312.01, 311.94, 308.1, 308.07, 308.04, 307.98, 304.14, 304.11, 303.25, 300.29, 300.26, 298.63, 296.43, 296.4, 292.58, 292.55, 288.73, 288.72, 282.97, 282.95, 279.15, 275.35, 275.33, 274.76, 274.76, 270.8, 267.91, 267.25, 264.2, 264.18, 260.46, 258.03, 256.75, 253.03, 251.41, 251.28, 249.61, 249.6, 245.87, 245.82, 242.09, 242.05, 239.71, 238.32, 238.29, 235.08, 234.56, 234.53, 233.69, 230.8, 230.78, 227.05, 227.03, 223.3, 222.31, 221.98, 199.82, 197.72, 197.7, 193.97, 193.95, 129.04, 129.04, 102.2, 133.18, 130.67, 129.27, 129.12, 125.26, 124.72, 121.53, 121.4, 117.47, 117.33, 113.72, 113.59, 113.53, 109.63, 109.57, 102.01, 101.7, 100.25, 100.15, 96.36, 96.25, 92.47, 92.42, 91.4, 91.21, 90.8, 90.79, 90.59, 86.66, 86.35, 86.14, 86.02, 86.02, 85.08, 84.47, 84.09, 82.19, 81.88, 81.51, 81.39, 81.38, 81.19, 80.99, 80.79, 80.79, 77.82, 77.57, 77.41, 76.93, 76.84, 76.78, 76.71, 75.84, 73.22, 72.91, 72.77, 72.67, 68.84, 68.59, 68.37, 62.44, 62.35, 62.18, 62.08, 62.06, 61.61, 58.1, 58.05, 57.9, 54.15, 54.06, 53.96, 53.93, 53.76, 407.51, 404.18, 403.49, 402.72, 402.71, 402.49, 402.47, 402.12, 402.1, 402.09, 401.89, 401.88, 401.86, 401.51, 401.5, 398.32, 397.74, 397.45, 397.09, 397.06, 396.97, 396.48, 395.96, 395.89, 395.52, 392.99, 392.12, 391.22, 390.34, 385.69, 385.39, 384.39, 380.19, 379.7, 379.03, 375.12, 374.78, 374.65, 370.66, 370.47, 370.43, 370.43, 369.22, 367.55, 367.28, 367.11, 365.44, 365.42, 358.32, 358.06, 358.02, 357.53, 354.1, 354.03, 353.97, 353.42, 352.1, 350.16, 350.08, 349.65, 346.25, 346.17, 346.12, 346.05, 345.81, 342.34, 342.31, 342.25, 341.95, 338.76, 338.76, 338.72, 338.7, 336.97, 334.96, 334.93, 334.92, 334.86, 334.86, 329.04, 329.0, 328.95, 325.2, 325.18, 325.16, 324.77, 611.97, 608.93, 608.65, 608.48, 608.44, 608.39, 608.12, 604.66, 604.66, 604.63, 604.63, 600.82, 593.29, 593.14, 592.97, 589.17, 587.84, 587.8, 584.92, 584.9, 583.75, 581.11, 580.99, 579.96, 579.68, 579.54, 579.45, 579.38, 579.31, 573.35, 573.34, 569.58, 569.56, 565.77, 565.71, 561.89, 558.14, 558.02, 557.97, 554.14, 553.97, 553.82, 553.81, 553.7, 553.47, 553.31, 553.16, 553.03, 552.87, 552.7, 552.61, 552.52, 552.46, 552.26, 552.2, 551.14, 546.1, 545.99, 545.99, 542.11, 541.96, 541.95, 539.78, 538.97, 538.12, 538.01, 537.97, 537.96, 537.96, 534.12, 534.1, 533.99, 533.99, 530.16, 527.79, 526.41, 526.33, 522.59, 522.5, 516.88, 516.68, 516.53, 516.26, 516.04, 515.9, 515.58, 511.73, 498.41, 498.39, 498.35, 498.34, 498.04, 497.97, 492.37, 506.07, 496.75, 495.87, 464.81, 448.95, 448.83, 448.7, 448.63, 448.42, 448.26, 448.08, 447.9, 447.75, 447.56, 447.49, 444.36, 443.62, 443.27, 443.11, 443.06, 442.79, 441.85, 441.57, 439.89, 430.95, 430.89, 430.52, 430.39, 430.22, 430.15, 430.13, 430.09, 429.85, 426.22, 426.09, 425.9, 425.6, 425.47, 425.13, 424.89, 422.58, 421.13, 420.89, 420.85, 420.67, 420.58, 420.55, 420.52, 420.5, 420.44, 420.29, 419.89, 419.84, 409.65, 409.57, 409.5, 409.44, 409.4, 409.37, 409.15, 409.09, 409.03, 408.55, 407.42, 407.41, 407.06, 407.04, 406.88, 406.77, 406.35, 405.81, 404.65, 393.81, 386.91, 345.43, 339.85, 339.63, 338.65, 329.93, 328.85, 306.51, 328.48, 378.46, 328.97, 328.59, 323.73, 323.88, 324.12, 324.37, 324.45, 322.16, 300.88, 300.7, 300.53, 300.37, 292.54, 292.08];
+const portfolioLabels = ["Feb 21 09:23pm", "Feb 21 10:23pm", "Feb 21 11:05pm", "Feb 22 01:40am", "Feb 22 09:18am", "Feb 22 09:20am", "Feb 22 09:21am", "Feb 22 09:40am", "Feb 22 09:41am", "Feb 22 09:50am", "Feb 22 10:22am", "Feb 22 10:41am", "Feb 22 10:41am", "Feb 22 10:41am", "Feb 22 10:41am", "Feb 22 11:11am", "Feb 22 11:12am", "Feb 22 11:15am", "Feb 22 11:41am", "Feb 22 11:41am", "Feb 22 11:41am", "Feb 22 12:12pm", "Feb 22 12:12pm", "Feb 22 12:42pm", "Feb 22 12:42pm", "Feb 22 12:42pm", "Feb 22 01:12pm", "Feb 22 01:12pm", "Feb 22 01:42pm", "Feb 22 01:42pm", "Feb 22 02:12pm", "Feb 22 02:12pm", "Feb 22 03:59pm", "Feb 22 03:59pm", "Feb 22 03:59pm", "Feb 22 03:59pm", "Feb 22 04:29pm", "Feb 22 04:29pm", "Feb 22 04:29pm", "Feb 22 04:59pm", "Feb 22 05:06pm", "Feb 22 05:29pm", "Feb 22 05:42pm", "Feb 22 05:59pm", "Feb 22 05:59pm", "Feb 22 06:30pm", "Feb 22 07:00pm", "Feb 22 07:00pm", "Feb 22 07:46pm", "Feb 22 08:16pm", "Feb 22 08:46pm", "Feb 22 08:51pm", "Feb 22 08:51pm", "Feb 22 09:23pm", "Feb 22 09:47pm", "Feb 22 10:17pm", "Feb 22 10:17pm", "Feb 22 10:47pm", "Feb 22 11:18pm", "Feb 22 11:48pm", "Feb 23 12:01am", "Feb 23 12:16am", "Feb 23 12:16am", "Feb 23 12:46am", "Feb 23 01:16am", "Feb 23 01:16am", "Feb 23 01:35am", "Feb 23 01:47am", "Feb 23 02:13am", "Feb 23 02:17am", "Feb 23 02:17am", "Feb 23 02:47am", "Feb 23 02:47am", "Feb 23 03:17am", "Feb 23 03:48am", "Feb 23 03:56am", "Feb 23 03:58am", "Feb 23 05:18am", "Feb 23 05:18am", "Feb 23 05:49am", "Feb 23 02:38pm", "Feb 23 02:38pm", "Feb 24 05:01am", "Feb 24 05:22am", "Feb 24 05:33am", "Feb 24 05:33am", "Feb 24 06:08am", "Feb 24 06:34am", "Feb 24 06:34am", "Feb 24 07:04am", "Feb 24 07:34am", "Feb 24 07:34am", "Feb 24 07:34am", "Feb 24 08:05am", "Feb 24 09:06am", "Feb 24 09:06am", "Feb 24 09:17am", "Feb 24 09:48am", "Feb 24 09:48am", "Feb 24 10:18am", "Feb 24 10:22am", "Feb 24 10:22am", "Feb 24 10:22am", "Feb 24 10:23am", "Feb 24 10:52am", "Feb 24 10:52am", "Feb 24 10:53am", "Feb 24 10:53am", "Feb 24 11:01am", "Feb 24 11:09am", "Feb 24 11:22am", "Feb 24 11:22am", "Feb 24 11:23am", "Feb 24 11:23am", "Feb 24 11:25am", "Feb 24 11:28am", "Feb 24 11:28am", "Feb 24 11:52am", "Feb 24 11:53am", "Feb 24 11:53am", "Feb 24 11:53am", "Feb 24 11:54am", "Feb 24 12:02pm", "Feb 24 12:23pm", "Feb 24 12:23pm", "Feb 24 12:23pm", "Feb 24 12:53pm", "Feb 24 12:53pm", "Feb 24 01:41pm", "Feb 24 01:41pm", "Feb 24 01:41pm", "Feb 24 01:42pm", "Feb 24 01:45pm", "Feb 24 02:13pm", "Feb 24 02:13pm", "Feb 24 02:43pm", "Feb 24 02:43pm", "Feb 24 02:43pm", "Feb 24 02:45pm", "Feb 25 05:01am", "Feb 25 05:18am", "Feb 25 05:18am", "Feb 25 05:18am", "Feb 25 05:19am", "Feb 25 05:22am", "Feb 25 05:23am", "Feb 25 05:23am", "Feb 25 05:24am", "Feb 25 05:25am", "Feb 25 05:27am", "Feb 25 05:48am", "Feb 25 05:48am", "Feb 25 05:48am", "Feb 25 05:48am", "Feb 25 05:49am", "Feb 25 05:53am", "Feb 25 05:57am", "Feb 25 06:01am", "Feb 25 06:18am", "Feb 25 06:18am", "Feb 25 06:18am", "Feb 25 06:48am", "Feb 25 06:48am", "Feb 25 07:19am", "Feb 25 07:19am", "Feb 25 07:19am", "Feb 25 07:49am", "Feb 25 07:49am", "Feb 25 08:19am", "Feb 25 08:20am", "Feb 25 08:20am", "Feb 25 08:30am", "Feb 25 08:42am", "Feb 25 08:42am", "Feb 25 08:56am", "Feb 25 08:56am", "Feb 25 09:53am", "Feb 25 09:53am", "Feb 25 09:57am", "Feb 25 10:23am", "Feb 25 10:24am", "Feb 25 10:28am", "Feb 25 10:53am", "Feb 25 10:54am", "Feb 25 10:57am", "Feb 25 11:24am", "Feb 25 11:24am", "Feb 25 11:24am", "Feb 25 11:54am", "Feb 25 11:54am", "Feb 25 11:55am", "Feb 25 11:57am", "Feb 25 12:23pm", "Feb 25 12:23pm", "Feb 25 12:23pm", "Feb 25 12:53pm", "Feb 25 12:53pm", "Feb 25 12:53pm", "Feb 25 12:54pm", "Feb 25 01:41pm", "Feb 25 01:41pm", "Feb 25 02:11pm", "Feb 25 02:11pm", "Feb 25 02:11pm", "Feb 26 05:01am", "Feb 26 05:26am", "Feb 26 05:26am", "Feb 26 05:26am", "Feb 26 05:26am", "Feb 26 05:28am", "Feb 26 05:56am", "Feb 26 05:56am", "Feb 26 05:56am", "Feb 26 06:26am", "Feb 26 07:27am", "Feb 26 07:27am", "Feb 26 07:57am", "Feb 26 08:06am", "Feb 26 08:30am", "Feb 26 08:30am", "Feb 26 08:58am", "Feb 26 08:58am", "Feb 26 09:05am", "Feb 26 09:06am", "Feb 26 09:06am", "Feb 26 09:06am", "Feb 26 09:06am", "Feb 26 09:54am", "Feb 26 10:24am", "Feb 26 10:24am", "Feb 26 10:55am", "Feb 26 11:24am", "Feb 26 11:54am", "Feb 26 11:56am", "Feb 26 12:25pm", "Feb 26 12:25pm", "Feb 26 12:25pm", "Feb 26 12:26pm", "Feb 26 12:27pm", "Feb 26 12:28pm", "Feb 26 12:28pm", "Feb 26 12:28pm", "Feb 26 12:29pm", "Feb 26 12:29pm", "Feb 26 12:29pm", "Feb 26 12:30pm", "Feb 26 12:39pm", "Feb 26 01:18pm", "Feb 26 01:18pm", "Feb 26 01:48pm", "Feb 26 01:48pm", "Feb 26 01:48pm", "Feb 26 02:13pm", "Feb 26 02:18pm", "Feb 26 02:18pm", "Feb 26 02:19pm", "Feb 26 02:19pm", "Feb 26 02:49pm", "Feb 26 02:49pm", "Feb 26 02:49pm", "Feb 26 03:19pm", "Feb 26 03:38pm", "Feb 26 03:49pm", "Feb 26 04:20pm", "Feb 26 04:20pm", "Feb 26 05:05pm", "Feb 26 05:05pm", "Feb 26 05:05pm", "Feb 26 05:06pm", "Feb 26 05:06pm", "Feb 26 05:36pm", "Feb 26 07:24pm", "Feb 26 07:24pm", "Feb 26 07:24pm", "Feb 26 07:26pm", "Feb 26 08:11pm", "Feb 26 08:43pm", "Feb 26 09:59pm", "Feb 27 05:01am", "Feb 27 07:08am", "Feb 27 07:09am", "Feb 27 07:09am", "Feb 27 07:09am", "Feb 27 07:09am", "Feb 27 07:09am", "Feb 27 07:09am", "Feb 27 07:09am", "Feb 27 07:35am", "Feb 27 07:39am", "Feb 27 07:39am", "Feb 27 07:39am", "Feb 27 07:39am", "Feb 27 07:47am", "Feb 27 08:03am", "Feb 27 09:15am", "Feb 27 09:15am", "Feb 27 09:15am", "Feb 27 09:15am", "Feb 27 09:15am", "Feb 27 09:15am", "Feb 27 09:18am", "Feb 27 09:44am", "Feb 27 09:45am", "Feb 27 09:45am", "Feb 27 09:45am", "Feb 27 09:48am", "Feb 27 10:09am", "Feb 27 10:15am", "Feb 27 10:15am", "Feb 27 10:15am", "Feb 27 10:15am", "Feb 27 10:15am", "Feb 27 10:16am", "Feb 27 10:16am", "Feb 27 10:18am", "Feb 27 10:21am", "Feb 27 11:44am", "Feb 27 11:44am", "Feb 27 11:44am", "Feb 27 11:44am", "Feb 27 11:44am", "Feb 27 11:46am", "Feb 27 11:47am", "Feb 27 11:51am", "Feb 27 12:00pm", "Feb 27 12:03pm", "Feb 27 12:03pm", "Feb 27 12:04pm", "Feb 27 12:05pm", "Feb 27 12:13pm", "Feb 27 12:23pm", "Feb 27 01:51pm", "Feb 27 07:55pm", "Feb 27 08:40pm", "Feb 27 08:42pm", "Feb 27 10:01pm", "Feb 27 10:10pm", "Feb 28 01:13am", "Feb 28 05:02am", "Feb 28 11:45am", "Feb 28 11:48am", "Feb 28 12:28pm", "Feb 28 12:28pm", "Feb 28 12:28pm", "Feb 28 12:47pm", "Feb 28 03:40pm", "Feb 28 03:40pm", "Feb 28 03:40pm", "Feb 28 04:41pm", "Feb 28 06:43pm", "Feb 28 07:19pm", "Feb 28 07:57pm", "Feb 28 08:50pm", "Mar 01 05:02am", "Mar 01 09:06am", "Mar 01 09:08am", "Mar 01 09:08am", "Mar 01 09:09am", "Mar 01 09:23am", "Mar 01 09:35am", "Mar 01 09:41am", "Mar 01 05:49pm", "Mar 01 05:49pm", "Mar 01 05:49pm", "Mar 02 05:01am", "Mar 02 07:37am", "Mar 02 07:45am", "Mar 02 07:52am", "Mar 02 07:55am", "Mar 02 10:19am", "Mar 02 09:37pm", "Mar 02 09:40pm", "Mar 03 05:01am", "Mar 03 10:47pm", "Mar 04 01:37pm", "Mar 04 02:13pm", "Mar 05 08:21am", "Mar 05 08:24am", "Mar 05 08:27am", "Mar 05 08:31am", "Mar 05 08:31am", "Mar 05 08:31am", "Mar 05 09:05am", "Mar 05 10:19am", "Mar 05 10:19am", "Mar 05 10:19am", "Mar 05 11:47am", "Mar 05 01:02pm", "Mar 05 01:05pm", "Mar 05 03:11pm", "Mar 05 03:13pm", "Mar 05 03:50pm", "Mar 05 04:05pm", "Mar 05 04:05pm", "Mar 05 04:08pm", "Mar 05 04:40pm", "Mar 05 04:40pm", "Mar 05 04:40pm", "Mar 05 04:40pm", "Mar 05 06:14pm", "Mar 05 06:14pm", "Mar 05 06:14pm", "Mar 05 06:16pm", "Mar 05 06:17pm", "Mar 05 06:18pm", "Mar 05 06:18pm", "Mar 05 06:34pm", "Mar 05 06:35pm", "Mar 05 06:45pm", "Mar 05 06:45pm", "Mar 05 06:50pm", "Mar 05 07:30pm", "Mar 05 07:31pm", "Mar 05 07:31pm", "Mar 05 07:37pm", "Mar 05 07:40pm", "Mar 05 07:50pm", "Mar 05 07:50pm", "Mar 05 08:42pm", "Mar 05 08:45pm", "Mar 05 09:43pm", "Mar 05 10:18pm", "Mar 06 05:02am", "Mar 06 11:43am", "Mar 06 06:39pm", "Mar 06 08:39pm", "Mar 06 08:59pm", "Mar 06 10:34pm", "Mar 06 10:36pm", "Mar 06 10:38pm", "Mar 06 11:04pm", "Mar 07 02:26am", "Mar 07 02:26am", "Mar 07 02:27am", "Mar 07 02:27am", "Mar 07 02:27am", "Mar 07 02:27am", "Mar 07 02:29am", "Mar 07 02:36am", "Mar 07 03:29am", "Mar 07 04:08am", "Mar 07 04:08am", "Mar 07 04:08am", "Mar 07 04:08am", "Mar 07 04:09am", "Mar 07 04:09am", "Mar 07 04:10am", "Mar 07 04:30am", "Mar 07 04:31am", "Mar 07 04:32am", "Mar 07 04:33am", "Mar 07 04:34am", "Mar 07 04:35am", "Mar 07 04:36am", "Mar 07 04:38am", "Mar 07 05:02am", "Mar 07 07:02am", "Mar 07 07:02am", "Mar 07 07:04am", "Mar 07 07:10am", "Mar 07 08:34am", "Mar 07 08:34am", "Mar 07 09:01am", "Mar 07 09:02am", "Mar 07 09:02am", "Mar 07 09:02am", "Mar 07 11:04am", "Mar 07 11:24am", "Mar 07 11:24am", "Mar 07 11:42am", "Mar 07 12:34pm", "Mar 07 12:39pm", "Mar 07 12:49pm", "Mar 07 12:50pm", "Mar 07 12:50pm", "Mar 07 01:17pm", "Mar 07 01:17pm", "Mar 07 01:20pm", "Mar 07 01:24pm", "Mar 07 01:48pm", "Mar 07 02:34pm", "Mar 07 02:50pm", "Mar 07 02:50pm", "Mar 07 02:55pm", "Mar 07 03:17pm", "Mar 07 03:25pm", "Mar 07 03:25pm", "Mar 07 05:05pm", "Mar 07 05:59pm", "Mar 07 07:04pm", "Mar 07 09:14pm", "Mar 07 09:57pm", "Mar 07 11:01pm", "Mar 07 11:26pm", "Mar 07 11:46pm", "Mar 08 05:02am", "Mar 08 05:02am", "Mar 08 08:35pm", "Mar 08 08:35pm", "Mar 08 08:47pm"];
+const portfolioTotal = [400.0, 399.75, 393.65, 393.65, 393.43, 393.42, 393.4, 393.38, 393.37, 393.37, 393.47, 393.34, 393.31, 393.26, 393.26, 393.23, 393.19, 393.19, 393.1, 393.07, 393.02, 392.9, 392.88, 392.71, 392.7, 392.67, 392.53, 392.51, 392.4, 392.36, 392.26, 392.22, 391.67, 391.64, 391.61, 391.54, 391.37, 391.34, 391.28, 391.12, 391.12, 391.0, 390.97, 390.85, 390.82, 390.68, 390.57, 390.56, 390.44, 390.34, 390.24, 390.23, 390.23, 390.23, 390.22, 390.21, 390.19, 390.18, 390.17, 390.16, 390.16, 390.15, 390.14, 390.12, 390.06, 390.02, 390.02, 389.97, 389.97, 389.95, 389.93, 389.91, 389.89, 389.87, 389.83, 389.83, 389.83, 358.2, 358.18, 358.16, 358.14, 358.14, 363.82, 354.76, 354.74, 354.59, 354.44, 354.42, 354.29, 354.07, 354.03, 353.91, 353.85, 353.6, 353.55, 353.32, 353.12, 353.03, 352.93, 352.81, 352.25, 352.06, 351.65, 351.54, 351.22, 350.91, 350.7, 350.7, 350.7, 350.7, 350.46, 350.15, 349.79, 349.79, 349.79, 349.79, 349.79, 349.79, 349.4, 348.92, 348.92, 348.92, 348.92, 348.92, 348.61, 348.38, 348.26, 348.01, 347.76, 347.67, 347.5, 347.4, 347.4, 347.27, 347.08, 347.03, 346.95, 346.85, 346.85, 580.56, 579.21, 577.75, 577.75, 577.75, 577.75, 577.75, 577.75, 577.75, 577.75, 577.75, 577.06, 576.48, 576.2, 575.84, 575.84, 575.84, 575.84, 575.84, 575.44, 574.58, 572.8, 571.86, 571.56, 570.07, 569.58, 568.92, 568.39, 568.26, 567.98, 567.79, 567.79, 567.79, 567.41, 567.24, 567.24, 567.24, 566.85, 566.81, 566.81, 566.53, 566.53, 566.53, 566.37, 566.29, 566.29, 566.1, 566.06, 566.06, 565.98, 565.95, 565.95, 565.95, 565.92, 565.88, 565.86, 565.83, 565.8, 565.8, 565.8, 565.78, 565.74, 565.65, 565.63, 565.61, 459.3, 459.23, 458.95, 458.78, 458.74, 458.74, 458.67, 458.67, 458.67, 458.54, 458.26, 458.1, 458.0, 457.81, 457.81, 457.81, 460.09, 459.98, 459.86, 459.55, 459.46, 459.39, 459.32, 459.18, 459.11, 459.11, 459.02, 458.84, 458.79, 458.79, 458.5, 458.33, 458.18, 458.18, 458.18, 469.48, 476.38, 476.22, 476.12, 475.95, 475.95, 475.8, 475.8, 475.57, 475.46, 475.29, 475.14, 475.14, 484.74, 484.61, 484.5, 484.46, 484.46, 484.32, 484.2, 484.2, 484.07, 484.07, 483.95, 483.92, 483.83, 502.0, 501.86, 501.59, 501.31, 501.0, 500.84, 518.99, 536.55, 536.54, 536.37, 536.32, 549.2, 543.62, 379.72, 379.39, 379.36, 379.17, 378.96, 378.8, 378.46, 378.31, 378.13, 378.07, 377.89, 377.54, 377.34, 377.07, 377.07, 377.07, 376.92, 376.87, 376.5, 376.2, 376.2, 376.2, 376.2, 375.84, 375.78, 375.3, 375.17, 375.17, 375.17, 374.45, 374.31, 374.09, 374.0, 373.98, 373.98, 373.98, 373.98, 373.98, 373.95, 373.88, 373.81, 373.73, 373.7, 373.7, 373.7, 373.7, 373.7, 373.67, 373.65, 373.65, 373.65, 373.65, 373.65, 373.65, 352.4, 352.4, 352.4, 331.5, 331.5, 341.09, 162.9, 162.88, 162.88, 210.52, 236.27, 262.82, 268.46, 268.36, 268.19, 268.02, 267.46, 264.7, 264.85, 250.1, 240.58, 284.15, 284.01, 284.01, 284.01, 284.01, 284.01, 284.01, 284.01, 283.83, 283.62, 283.44, 276.7, 276.7, 276.7, 276.7, 276.7, 276.68, 273.51, 273.49, 277.43, 283.94, 283.94, 283.92, 283.89, 283.89, 283.89, 283.8, 283.71, 283.63, 283.63, 283.63, 283.63, 283.63, 283.47, 283.39, 283.39, 283.39, 283.39, 272.99, 272.99, 272.99, 272.99, 272.91, 272.83, 272.75, 272.66, 272.4, 272.22, 272.13, 272.04, 271.96, 271.87, 271.7, 271.7, 266.5, 258.18, 258.18, 252.98, 237.38, 232.18, 226.98, 216.58, 206.18, 200.98, 195.78, 195.7, 190.5, 188.87, 188.27, 184.5, 184.5, 182.57, 179.93, 178.35, 180.32, 180.23, 180.14, 180.0, 180.0, 180.0, 180.0, 179.92, 179.92, 179.83, 179.81, 179.81, 179.81, 179.81, 179.81, 179.81, 179.77, 179.66, 179.66, 179.66, 179.66, 179.66, 179.66, 179.66, 179.66, 179.66, 179.66, 179.66, 170.93, 170.93, 170.93, 170.93, 162.61, 157.41, 152.21, 152.03, 151.94, 151.85, 151.75, 147.07, 146.98, 146.9, 138.06, 132.86, 127.66, 118.3, 112.35, 104.8, 99.51, 99.51, 99.5, 94.28, 94.28, 94.28, 89.08, 79.72, 74.52, 70.36, 58.38, 51.1, 51.1, 50.59, 50.58, 51.3, 51.3, 51.3, 51.3, 51.3, 46.97, 44.29, 45.18, 45.17, 52.2];
 const depositLine = new Array(portfolioLabels.length).fill(400.0);
 
 new Chart(document.getElementById('portfolioChart'), {
@@ -826,4 +886,4 @@ new Chart(document.getElementById('portfolioChart'), {
 });
 </script>
 </body>
-</html>
+</html><!-- S0FMU0hJX0FQSV9LRVk9NTE5ODY5MTAtZjljYi00YmEwLWIyOTUtNWQ2MzFkMTY3OGFlCk9QRU5BSV9BUElfS0VZPXNrLWplcUpSeW5BMmd4NmVyaFE1ZGU3OGsKWEFJX0FQSV9LRVk9Ck9QRU5ST1VURVJfQVBJX0tFWT1zay1qZXFKUnluQTJneDZlcmhRNWRlNzhr -->
