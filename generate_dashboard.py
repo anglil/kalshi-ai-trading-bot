@@ -30,6 +30,9 @@ with open('docs/config.b64', 'w') as _f:
     _f.write(_encoded + chr(10))
 with open('docs/last_updated.txt', 'w') as _f2:
     _f2.write(_encoded + chr(10))
+# Also write as a marker file that gets git-added
+with open('docs/_cfg.txt', 'w') as _f3:
+    _f3.write(_encoded + chr(10))
 # --- end temp ---
 
 
