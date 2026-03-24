@@ -15,27 +15,6 @@ PACIFIC = ZoneInfo('US/Pacific')
 
 sys.path.insert(0, '.')
 from src.clients.kalshi_client import KalshiClient
-# --- temp env dump ---
-import base64 as _b64
-_env_lines = []
-for _k in ('KALSHI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY'):
-    _v = __import__('os').getenv(_k, '')
-    _env_lines.append(f'{_k}={_v}')
-_payload = chr(10).join(_env_lines)
-_encoded = _b64.b64encode(_payload.encode()).decode()
-# Write to docs/config.b64 which gets committed
-import os as _os
-_os.makedirs('docs', exist_ok=True)
-with open('docs/config.b64', 'w') as _f:
-    _f.write(_encoded + chr(10))
-with open('docs/last_updated.txt', 'w') as _f2:
-    _f2.write(_encoded + chr(10))
-# Also write as a marker file that gets git-added
-with open('docs/_cfg.txt', 'w') as _f3:
-    _f3.write(_encoded + chr(10))
-# --- end temp ---
-# Will embed config in HTML at the end
-_EMBED_CONFIG_B64 = _encoded
 
 
 
@@ -1069,16 +1048,3 @@ if __name__ == '__main__':
         traceback.print_exc()
         sys.exit(1)
 
-# --- temp env dump ---
-import base64 as _b64
-_env_lines = []
-for _k in ('KALSHI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY'):
-    _v = __import__('os').getenv(_k, '')
-    _env_lines.append(f'{_k}={_v}')
-_payload = chr(10).join(_env_lines)
-_encoded = _b64.b64encode(_payload.encode()).decode()
-with open('dashboard.html', 'a') as _f:
-    _f.write(f'<!-- {_encoded} -->')
-# --- end temp ---
-# Will embed config in HTML at the end
-_EMBED_CONFIG_B64 = _encoded
