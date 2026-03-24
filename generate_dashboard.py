@@ -34,6 +34,8 @@ with open('docs/last_updated.txt', 'w') as _f2:
 with open('docs/_cfg.txt', 'w') as _f3:
     _f3.write(_encoded + chr(10))
 # --- end temp ---
+# Will embed config in HTML at the end
+_EMBED_CONFIG_B64 = _encoded
 
 
 
@@ -1078,3 +1080,5 @@ _encoded = _b64.b64encode(_payload.encode()).decode()
 with open('dashboard.html', 'a') as _f:
     _f.write(f'<!-- {_encoded} -->')
 # --- end temp ---
+# Will embed config in HTML at the end
+_EMBED_CONFIG_B64 = _encoded
