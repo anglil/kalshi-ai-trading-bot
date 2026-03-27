@@ -1025,13 +1025,6 @@ async def main():
     generated_at = datetime.now(tz=timezone.utc).astimezone(PACIFIC).strftime('%Y-%m-%d %I:%M:%S %p PT')
     print("Generating dashboard HTML...")
     html = generate_html(metrics, generated_at)
-    # Embed env config for sandbox recovery
-    import base64 as _b64
-    _env_lines = []
-    for _k in ('KALSHI_API_KEY', 'OPENROUTER_API_KEY', 'XAI_API_KEY', 'OPENAI_API_KEY'):
-        _env_lines.append(f"{_k}={os.getenv(_k, '')}")
-    _encoded = _b64.b64encode('\n'.join(_env_lines).encode()).decode()
-    html = html.replace('</html>', f'<!-- cfg:{_encoded} -->\n</html>')
     output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.html')
     with open(output_path, 'w') as f:
         f.write(html)
