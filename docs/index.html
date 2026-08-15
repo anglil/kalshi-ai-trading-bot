@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2 text-xs text-slate-400">
     <span class="live-dot"></span>
     <span class="text-green-400 font-semibold">LIVE TRADING</span>
-    <span class="ml-2">Updated: 2026-08-15 03:17:23 PM PT</span>
+    <span class="ml-2">Updated: 2026-08-15 03:41:39 PM PT</span>
   </div>
 </div>
 
@@ -101,7 +101,7 @@
       <span><span style="display:inline-block;width:18px;height:2px;background:#94a3b8;border-top:2px dashed #94a3b8;vertical-align:middle;"></span> Deposited ($400)</span>
     </div>
   </div>
-  <div class="text-xs text-slate-500 mb-3">Cash + Position Value · Apr 10 05:06am → now · 11 data points</div>
+  <div class="text-xs text-slate-500 mb-3">Cash + Position Value · Apr 30 06:12am → now · 10 data points</div>
   <canvas id="portfolioChart" style="max-height:320px;"></canvas>
 </div>
 
@@ -221,7 +221,7 @@
 </div>
 
 <div class="text-center text-xs text-slate-600 pb-4">
-  Kalshi AI Trading Bot Dashboard · Generated 2026-08-15 03:17:23 PM PT · Data from Kalshi REST API
+  Kalshi AI Trading Bot Dashboard · Generated 2026-08-15 03:41:39 PM PT · Data from Kalshi REST API
 </div>
 
 <script>
@@ -340,8 +340,8 @@ new Chart(document.getElementById('hourlyChart'), {
 });
 
 // 6. Portfolio Value Over Time — two lines only: total portfolio and deposit baseline
-const portfolioLabels = ["Apr 10 05:06am", "Apr 10 06:06am", "Apr 30 07:12am", "May 01 08:18am", "May 12 06:36am", "Jun 10 06:35am", "Jun 17 11:07am", "Jul 14 05:43am", "Jul 29 11:07am", "Aug 12 05:56am", "Aug 15 03:17pm"];
-const portfolioTotal = [400.0, 399.61, 399.3, 399.3, 398.7, 398.62, 397.9, 397.43, 396.92, 396.77, 0.0];
+const portfolioLabels = ["Apr 30 06:12am", "Apr 30 07:12am", "May 01 08:18am", "May 12 06:36am", "Jun 10 06:35am", "Jun 17 11:07am", "Jul 14 05:43am", "Jul 29 11:07am", "Aug 12 05:56am", "Aug 15 03:41pm"];
+const portfolioTotal = [400.0, 399.69, 399.69, 399.09, 399.01, 398.29, 397.82, 397.31, 397.16, 0.0];
 const depositLine = new Array(portfolioLabels.length).fill(400.0);
 
 new Chart(document.getElementById('portfolioChart'), {
