@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2 text-xs text-slate-400">
     <span class="live-dot"></span>
     <span class="text-green-400 font-semibold">LIVE TRADING</span>
-    <span class="ml-2">Updated: 2026-08-15 12:48:53 PM PT</span>
+    <span class="ml-2">Updated: 2026-08-15 12:59:32 PM PT</span>
   </div>
 </div>
 
@@ -101,7 +101,7 @@
       <span><span style="display:inline-block;width:18px;height:2px;background:#94a3b8;border-top:2px dashed #94a3b8;vertical-align:middle;"></span> Deposited ($400)</span>
     </div>
   </div>
-  <div class="text-xs text-slate-500 mb-3">Cash + Position Value · Mar 07 08:14pm → now · 21 data points</div>
+  <div class="text-xs text-slate-500 mb-3">Cash + Position Value · Mar 11 04:02am → now · 14 data points</div>
   <canvas id="portfolioChart" style="max-height:320px;"></canvas>
 </div>
 
@@ -221,7 +221,7 @@
 </div>
 
 <div class="text-center text-xs text-slate-600 pb-4">
-  Kalshi AI Trading Bot Dashboard · Generated 2026-08-15 12:48:53 PM PT · Data from Kalshi REST API
+  Kalshi AI Trading Bot Dashboard · Generated 2026-08-15 12:59:32 PM PT · Data from Kalshi REST API
 </div>
 
 <script>
@@ -340,8 +340,8 @@ new Chart(document.getElementById('hourlyChart'), {
 });
 
 // 6. Portfolio Value Over Time — two lines only: total portfolio and deposit baseline
-const portfolioLabels = ["Mar 07 08:14pm", "Mar 07 09:14pm", "Mar 08 05:02am", "Mar 08 05:02am", "Mar 09 05:01am", "Mar 09 06:40pm", "Mar 10 05:02am", "Mar 10 08:49am", "Mar 11 05:02am", "Mar 11 06:37am", "Mar 14 10:13am", "Apr 10 06:06am", "Apr 30 07:12am", "May 01 08:18am", "May 12 06:36am", "Jun 10 06:35am", "Jun 17 11:07am", "Jul 14 05:43am", "Jul 29 11:07am", "Aug 12 05:56am", "Aug 15 12:48pm"];
-const portfolioTotal = [400.0, 405.4, 405.39, 411.25, 411.24, 411.2, 410.76, 410.76, 410.76, 410.14, 410.14, 409.75, 409.44, 409.44, 408.84, 408.76, 408.04, 407.57, 407.06, 406.91, 0.0];
+const portfolioLabels = ["Mar 11 04:02am", "Mar 11 05:02am", "Mar 11 06:37am", "Mar 14 10:13am", "Apr 10 06:06am", "Apr 30 07:12am", "May 01 08:18am", "May 12 06:36am", "Jun 10 06:35am", "Jun 17 11:07am", "Jul 14 05:43am", "Jul 29 11:07am", "Aug 12 05:56am", "Aug 15 12:59pm"];
+const portfolioTotal = [400.0, 400.0, 399.38, 399.38, 398.99, 398.68, 398.68, 398.08, 398.0, 397.28, 396.81, 396.3, 396.15, 0.0];
 const depositLine = new Array(portfolioLabels.length).fill(400.0);
 
 new Chart(document.getElementById('portfolioChart'), {
